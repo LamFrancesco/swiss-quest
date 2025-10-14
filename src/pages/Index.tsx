@@ -1,21 +1,25 @@
 import { useState } from 'react';
-import { Loader2, Mountain } from 'lucide-react';
-import Hero from '@/components/Hero';
-import ActivityCard from '@/components/ActivityCard';
+import { Mountain } from 'lucide-react';
+import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery } from '@/lib/nlp';
 import { searchActivities, Activity } from '@/lib/api';
 import { toast } from 'sonner';
 
 const Index = () => {
-  const [activities, setActivities] = useState<Activity[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [searchPerformed, setSearchPerformed] = useState(false);
 
-  const handleSearch = async (query: string) => {
+  const handleSendMessage = async (query: string) => {
+    // Add user message
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      type: 'user',
+      content: query,
+    };
+    setMessages(prev => [...prev, userMessage]);
     setLoading(true);
-    setSearchPerformed(true);
 
     try {
       // Parse natural language query
@@ -29,9 +33,12 @@ const Index = () => {
       if (parsed.suitableFor) understood.push(`For: ${parsed.suitableFor}`);
 
       if (understood.length > 0) {
-        toast.success('Understanding your request', {
-          description: understood.join(' • '),
-        });
+        const assistantMessage: Message = {
+          id: `assistant-${Date.now()}`,
+          type: 'assistant',
+          content: `I understand you're looking for: ${understood.join(', ')}. Let me find the best options for you!`,
+        };
+        setMessages(prev => [...prev, assistantMessage]);
       }
 
       // Search activities
@@ -43,14 +50,28 @@ const Index = () => {
         query,
       });
 
-      setActivities(results);
-
       if (results.length === 0) {
-        toast.info('No activities found', {
-          description: 'Try adjusting your search criteria',
-        });
+        const noResultsMessage: Message = {
+          id: `assistant-${Date.now()}-no-results`,
+          type: 'assistant',
+          content: "I couldn't find any activities matching those criteria. Try adjusting your search or ask me for something different!",
+        };
+        setMessages(prev => [...prev, noResultsMessage]);
+      } else {
+        const activitiesMessage: Message = {
+          id: `activities-${Date.now()}`,
+          type: 'activities',
+          activities: results,
+        };
+        setMessages(prev => [...prev, activitiesMessage]);
       }
     } catch (error) {
+      const errorMessage: Message = {
+        id: `assistant-${Date.now()}-error`,
+        type: 'assistant',
+        content: "Sorry, I encountered an error while searching. Please try again!",
+      };
+      setMessages(prev => [...prev, errorMessage]);
       toast.error('Search failed', {
         description: 'Please try again',
       });
@@ -60,65 +81,29 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="absolute top-0 left-0 right-0 z-10 px-6 py-4">
+      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-6 py-4 flex-shrink-0">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 text-white">
-            <Mountain className="h-6 w-6" />
+          <div className="flex items-center gap-2 text-foreground">
+            <Mountain className="h-6 w-6 text-primary" />
             <span className="font-bold text-lg">SwissQuest</span>
           </div>
-          <div className="text-white/80 text-sm">
+          <div className="text-muted-foreground text-sm">
             Powered by MySwitzerland
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <Hero onSearch={handleSearch} />
-
-      {/* Results Section */}
-      {searchPerformed && (
-        <div className="max-w-7xl mx-auto px-4 py-12">
-          {loading ? (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <Loader2 className="h-12 w-12 animate-spin text-primary" />
-              <p className="text-muted-foreground">Searching for perfect experiences...</p>
-            </div>
-          ) : activities.length > 0 ? (
-            <>
-              <div className="mb-8">
-                <h2 className="text-3xl font-bold text-foreground mb-2">
-                  Recommended Activities
-                </h2>
-                <p className="text-muted-foreground">
-                  Found {activities.length} {activities.length === 1 ? 'activity' : 'activities'} matching your preferences
-                </p>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {activities.map((activity) => (
-                  <ActivityCard
-                    key={activity.id}
-                    activity={activity}
-                    onClick={() => setSelectedActivity(activity)}
-                  />
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-20 gap-4">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center">
-                <Mountain className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold">No activities found</h3>
-              <p className="text-muted-foreground text-center max-w-md">
-                Try adjusting your search criteria or use different keywords
-              </p>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Chat Interface */}
+      <div className="flex-1 overflow-hidden">
+        <ChatInterface
+          messages={messages}
+          onSendMessage={handleSendMessage}
+          onActivityClick={setSelectedActivity}
+          loading={loading}
+        />
+      </div>
 
       {/* Activity Detail Modal */}
       <ActivityDetail
