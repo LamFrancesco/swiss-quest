@@ -25,20 +25,19 @@ const Index = () => {
       // Parse natural language query
       const parsed = parseQuery(query);
       
-      // Show what we understood
-      const understood = [];
-      if (parsed.experienceType) understood.push(`Type: ${parsed.experienceType}`);
-      if (parsed.neededTime) understood.push(`Duration: ${parsed.neededTime}`);
-      if (parsed.difficulty) understood.push(`Difficulty: ${parsed.difficulty}`);
-      if (parsed.suitableFor) understood.push(`For: ${parsed.suitableFor}`);
-
-      if (understood.length > 0) {
-        const assistantMessage: Message = {
-          id: `assistant-${Date.now()}`,
-          type: 'assistant',
-          content: `I understand you're looking for: ${understood.join(', ')}. Let me find the best options for you!`,
+      // Always show what we understood with filters
+      if (parsed.experienceType || parsed.neededTime || parsed.difficulty || parsed.suitableFor) {
+        const understandingMessage: Message = {
+          id: `understanding-${Date.now()}`,
+          type: 'understanding',
+          filters: {
+            experienceType: parsed.experienceType,
+            neededTime: parsed.neededTime,
+            difficulty: parsed.difficulty,
+            suitableFor: parsed.suitableFor,
+          },
         };
-        setMessages(prev => [...prev, assistantMessage]);
+        setMessages(prev => [...prev, understandingMessage]);
       }
 
       // Search activities
@@ -50,7 +49,10 @@ const Index = () => {
         query,
       });
 
-      if (results.length === 0) {
+      // Limit results to 5-7 activities
+      const limitedResults = results.slice(0, 7);
+
+      if (limitedResults.length === 0) {
         const noResultsMessage: Message = {
           id: `assistant-${Date.now()}-no-results`,
           type: 'assistant',
@@ -61,7 +63,7 @@ const Index = () => {
         const activitiesMessage: Message = {
           id: `activities-${Date.now()}`,
           type: 'activities',
-          activities: results,
+          activities: limitedResults,
         };
         setMessages(prev => [...prev, activitiesMessage]);
       }

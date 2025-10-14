@@ -7,9 +7,15 @@ import { Activity } from '@/lib/api';
 
 interface Message {
   id: string;
-  type: 'user' | 'assistant' | 'activities';
+  type: 'user' | 'assistant' | 'activities' | 'understanding';
   content?: string;
   activities?: Activity[];
+  filters?: {
+    experienceType?: string;
+    neededTime?: string;
+    difficulty?: string;
+    suitableFor?: string;
+  };
 }
 
 interface ChatInterfaceProps {

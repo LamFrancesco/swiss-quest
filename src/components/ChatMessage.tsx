@@ -1,15 +1,52 @@
 import { Bot, User } from 'lucide-react';
 import { Activity } from '@/lib/api';
 import ActivityCard from './ActivityCard';
+import { Badge } from './ui/badge';
 
 interface ChatMessageProps {
-  type: 'user' | 'assistant' | 'activities';
+  type: 'user' | 'assistant' | 'activities' | 'understanding';
   content?: string;
   activities?: Activity[];
+  filters?: {
+    experienceType?: string;
+    neededTime?: string;
+    difficulty?: string;
+    suitableFor?: string;
+  };
   onActivityClick?: (activity: Activity) => void;
 }
 
-const ChatMessage = ({ type, content, activities, onActivityClick }: ChatMessageProps) => {
+const ChatMessage = ({ type, content, activities, filters, onActivityClick }: ChatMessageProps) => {
+  const getFilterLabel = (key: string, value: string) => {
+    const labels: Record<string, Record<string, string>> = {
+      experienceType: {
+        culture: 'cultural',
+        outdoor: 'outdoor',
+        gastronomy: 'gastronomy',
+        shopping: 'shopping',
+        wellness: 'wellness',
+      },
+      neededTime: {
+        lessthan1hour: 'less than 1 hour',
+        between1_2hours: '1-2 hours',
+        between2_4hours: '2-4 hours',
+        between4_8hours: '4-8 hours',
+        morethan1day: 'more than 1 day',
+      },
+      difficulty: {
+        low: 'easy',
+        medium: 'moderate',
+        high: 'difficult',
+      },
+      suitableFor: {
+        family: 'families',
+        groups: 'groups',
+        individual: 'solo travelers',
+      },
+    };
+    return labels[key]?.[value] || value;
+  };
+
   if (type === 'user') {
     return (
       <div className="flex gap-3 justify-end">
@@ -18,6 +55,49 @@ const ChatMessage = ({ type, content, activities, onActivityClick }: ChatMessage
         </div>
         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
           <User className="h-4 w-4 text-primary" />
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'understanding' && filters) {
+    const filterParts: string[] = [];
+    if (filters.experienceType) filterParts.push(getFilterLabel('experienceType', filters.experienceType));
+    if (filters.suitableFor) filterParts.push(`suitable for ${getFilterLabel('suitableFor', filters.suitableFor)}`);
+    if (filters.neededTime) filterParts.push(`lasting ${getFilterLabel('neededTime', filters.neededTime)}`);
+    if (filters.difficulty) filterParts.push(`${getFilterLabel('difficulty', filters.difficulty)} difficulty`);
+
+    return (
+      <div className="flex gap-3">
+        <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+          <Bot className="h-4 w-4 text-primary" />
+        </div>
+        <div className="bg-accent px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%]">
+          <p className="text-sm text-foreground mb-3">
+            I understood that you're looking for something:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {filters.experienceType && (
+              <Badge variant="default" className="text-xs">
+                {getFilterLabel('experienceType', filters.experienceType)}
+              </Badge>
+            )}
+            {filters.suitableFor && (
+              <Badge variant="secondary" className="text-xs">
+                for {getFilterLabel('suitableFor', filters.suitableFor)}
+              </Badge>
+            )}
+            {filters.neededTime && (
+              <Badge variant="secondary" className="text-xs">
+                {getFilterLabel('neededTime', filters.neededTime)}
+              </Badge>
+            )}
+            {filters.difficulty && (
+              <Badge variant="outline" className="text-xs">
+                {getFilterLabel('difficulty', filters.difficulty)}
+              </Badge>
+            )}
+          </div>
         </div>
       </div>
     );
