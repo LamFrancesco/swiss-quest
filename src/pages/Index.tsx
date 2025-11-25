@@ -1,15 +1,39 @@
 import { useState } from 'react';
-import { Mountain } from 'lucide-react';
+import { Mountain, BarChart } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery } from '@/lib/nlp';
 import { searchActivities, Activity } from '@/lib/api';
 import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { runFullEvaluation } from '@/lib/metrics';
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [evaluating, setEvaluating] = useState(false);
+
+  const handleRunEvaluation = async () => {
+    setEvaluating(true);
+    toast.info("Starting metrics evaluation...", {
+      description: "Check the browser console for detailed results"
+    });
+    
+    try {
+      const report = await runFullEvaluation();
+      toast.success("Evaluation complete!", {
+        description: `Avg Precision: ${(report.averages.avgPrecision * 100).toFixed(1)}%, Avg Recall: ${(report.averages.avgRecall * 100).toFixed(1)}%`
+      });
+    } catch (error) {
+      console.error("Evaluation failed:", error);
+      toast.error("Evaluation failed", {
+        description: "Check the console for error details"
+      });
+    } finally {
+      setEvaluating(false);
+    }
+  };
 
   const handleSendMessage = async (query: string) => {
     // Add user message
@@ -91,8 +115,20 @@ const Index = () => {
             <Mountain className="h-6 w-6 text-primary" />
             <span className="font-bold text-lg">SwissQuest</span>
           </div>
-          <div className="text-muted-foreground text-sm">
-            Powered by MySwitzerland
+          <div className="flex items-center gap-4">
+            <Button 
+              onClick={handleRunEvaluation}
+              disabled={evaluating}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <BarChart className="h-4 w-4" />
+              {evaluating ? "Evaluating..." : "Run Evaluation"}
+            </Button>
+            <div className="text-muted-foreground text-sm">
+              Powered by MySwitzerland
+            </div>
           </div>
         </div>
       </header>
