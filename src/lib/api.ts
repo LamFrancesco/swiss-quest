@@ -77,70 +77,147 @@ function transformActivities(data: any): Activity[] {
 function getMockActivities(filters: any): Activity[] {
   const mockData: Activity[] = [
     {
-      id: '1',
-      title: 'Matterhorn Glacier Paradise',
-      description: 'Experience the highest cable car station in Europe at 3,883m. Enjoy breathtaking panoramic views of the Alps.',
-      imageUrl: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80',
-      location: 'Zermatt',
-      duration: '2-4 hours',
-      difficulty: 'low',
-      suitableFor: ['family', 'groups'],
-      experienceType: 'outdoor',
-    },
-    {
-      id: '2',
-      title: 'Swiss National Museum',
-      description: 'Discover Swiss cultural history from its beginnings to the present in this historic castle-like building.',
+      id: 'chaplin-world',
+      title: "Chaplin's World",
+      description: 'Discover the world of Charlie Chaplin in his former Swiss home. Immersive museum experience.',
       imageUrl: 'https://images.unsplash.com/photo-1566127444979-b3d2b6a90542?w=800&q=80',
-      location: 'Zurich',
+      location: 'Corsier-sur-Vevey',
       duration: '1-2 hours',
       difficulty: 'low',
-      suitableFor: ['family', 'individual'],
-      experienceType: 'culture',
+      suitableFor: ['families', 'couples', 'individual'],
+      experienceType: 'cultural',
     },
     {
-      id: '3',
+      id: 'olympic-museum',
+      title: 'Olympic Museum',
+      description: 'Explore the history of the Olympic Games through interactive exhibits and memorabilia.',
+      imageUrl: 'https://images.unsplash.com/photo-1566127444979-b3d2b6a90542?w=800&q=80',
+      location: 'Lausanne',
+      duration: '1-2 hours',
+      difficulty: 'low',
+      suitableFor: ['families', 'kids', 'groups'],
+      experienceType: 'cultural',
+    },
+    {
+      id: 'jungfraujoch',
       title: 'Jungfraujoch - Top of Europe',
       description: 'Journey to the highest railway station in Europe. Marvel at the Aletsch Glacier and Alpine panorama.',
       imageUrl: 'https://images.unsplash.com/photo-1509556662326-d044e64e8a5d?w=800&q=80',
       location: 'Jungfrau Region',
-      duration: '4-8 hours',
+      duration: 'full day',
       difficulty: 'medium',
-      suitableFor: ['groups', 'individual'],
+      suitableFor: ['families', 'groups', 'individual'],
       experienceType: 'outdoor',
     },
     {
-      id: '4',
+      id: 'rhine-falls',
+      title: 'Rhine Falls',
+      description: "Europe's largest waterfall. Experience the thundering falls from viewing platforms and boat trips.",
+      imageUrl: 'https://images.unsplash.com/photo-1531366936337-7c912a4589a7?w=800&q=80',
+      location: 'Schaffhausen',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['families', 'kids', 'groups'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'mount-rigi',
+      title: 'Mount Rigi - Queen of Mountains',
+      description: 'Easy accessible mountain with stunning panoramic views. Perfect for gentle hiking and relaxation.',
+      imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
+      location: 'Central Switzerland',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['families', 'seniors', 'individual'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'chapel-bridge',
       title: 'Chapel Bridge & Old Town Lucerne',
       description: 'Walk across the iconic wooden bridge and explore the charming medieval old town.',
       imageUrl: 'https://images.unsplash.com/photo-1572207648389-08f6d3f6c040?w=800&q=80',
       location: 'Lucerne',
-      duration: '1-2 hours',
+      duration: 'less than 1 hour',
       difficulty: 'low',
-      suitableFor: ['family', 'groups', 'individual'],
-      experienceType: 'culture',
+      suitableFor: ['couples', 'families', 'individual'],
+      experienceType: 'cultural',
     },
     {
-      id: '5',
+      id: 'glacier-express',
+      title: 'Glacier Express',
+      description: 'Legendary panoramic train journey through the Swiss Alps. An unforgettable full-day experience.',
+      imageUrl: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800&q=80',
+      location: 'Zermatt to St. Moritz',
+      duration: 'full day',
+      difficulty: 'low',
+      suitableFor: ['couples', 'seniors', 'groups'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'swiss-national-museum',
+      title: 'Swiss National Museum',
+      description: 'Discover Swiss cultural history from its beginnings to the present.',
+      imageUrl: 'https://images.unsplash.com/photo-1566127444979-b3d2b6a90542?w=800&q=80',
+      location: 'Zurich',
+      duration: '1-2 hours',
+      difficulty: 'low',
+      suitableFor: ['families', 'individual'],
+      experienceType: 'cultural',
+    },
+    {
+      id: 'gruyeres-cheese',
       title: 'Gruyères Cheese Factory Tour',
       description: 'Discover the secrets of Swiss cheese making and taste authentic Gruyère AOP.',
       imageUrl: 'https://images.unsplash.com/photo-1486297678162-eb2a19b0a32d?w=800&q=80',
       location: 'Gruyères',
-      duration: 'Less than 1 hour',
+      duration: 'less than 1 hour',
       difficulty: 'low',
-      suitableFor: ['family', 'groups'],
+      suitableFor: ['families', 'groups'],
       experienceType: 'gastronomy',
     },
   ];
 
+  // Normalize filter values for comparison
+  const normalizeValue = (value: string) => value?.toLowerCase().trim();
+
   // Filter based on provided filters
   return mockData.filter(activity => {
-    if (filters.experienceType && activity.experienceType !== filters.experienceType) {
-      return false;
+    // Experience type filter
+    if (filters.experienceType) {
+      const filterType = normalizeValue(filters.experienceType);
+      const activityType = normalizeValue(activity.experienceType || '');
+      if (activityType !== filterType) {
+        return false;
+      }
     }
-    if (filters.difficulty && activity.difficulty !== filters.difficulty) {
-      return false;
+
+    // Difficulty filter
+    if (filters.difficulty) {
+      const filterDifficulty = normalizeValue(filters.difficulty);
+      const activityDifficulty = normalizeValue(activity.difficulty || '');
+      if (activityDifficulty !== filterDifficulty) {
+        return false;
+      }
     }
+
+    // Suitable for filter
+    if (filters.suitableFor) {
+      const filterSuitable = normalizeValue(filters.suitableFor);
+      const activitySuitable = activity.suitableFor?.map(s => normalizeValue(s)) || [];
+      if (!activitySuitable.includes(filterSuitable)) {
+        return false;
+      }
+    }
+
+    // Needed time filter
+    if (filters.neededTime) {
+      const filterTime = normalizeValue(filters.neededTime);
+      const activityTime = normalizeValue(activity.duration || '');
+      if (activityTime !== filterTime) {
+        return false;
+      }
+    }
+
     return true;
   });
 }
