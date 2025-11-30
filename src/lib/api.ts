@@ -175,10 +175,143 @@ function getMockActivities(filters: any): Activity[] {
       suitableFor: ['families', 'groups'],
       experienceType: 'gastronomy',
     },
+    {
+      id: 'bern-old-town',
+      title: 'Bern Old Town Walking Tour',
+      description: 'UNESCO World Heritage site with medieval arcades, fountains, and stunning architecture.',
+      imageUrl: 'https://images.unsplash.com/photo-1572207648389-08f6d3f6c040?w=800&q=80',
+      location: 'Bern',
+      duration: '1-2 hours',
+      difficulty: 'low',
+      suitableFor: ['seniors', 'couples', 'families', 'individual'],
+      experienceType: 'cultural',
+    },
+    {
+      id: 'lake-geneva-cruise',
+      title: 'Lake Geneva Scenic Cruise',
+      description: 'Relaxing boat ride on Lake Geneva with views of the Alps and charming lakeside towns.',
+      imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80',
+      location: 'Lake Geneva',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['seniors', 'couples', 'families'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'swiss-transport-museum',
+      title: 'Swiss Museum of Transport',
+      description: 'Interactive museum showcasing trains, planes, automobiles, and space travel.',
+      imageUrl: 'https://images.unsplash.com/photo-1566127444979-b3d2b6a90542?w=800&q=80',
+      location: 'Lucerne',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['families', 'kids', 'groups'],
+      experienceType: 'cultural',
+    },
+    {
+      id: 'matterhorn-glacier-paradise',
+      title: 'Matterhorn Glacier Paradise',
+      description: 'Highest cable car station in Europe with breathtaking views of the iconic Matterhorn.',
+      imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
+      location: 'Zermatt',
+      duration: '2-4 hours',
+      difficulty: 'medium',
+      suitableFor: ['families', 'individual', 'couples'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'lavaux-vineyards',
+      title: 'Lavaux Vineyards Terrace Walk',
+      description: 'UNESCO terraced vineyards with wine tasting and stunning lake views.',
+      imageUrl: 'https://images.unsplash.com/photo-1506377247377-2a5b3b417ebb?w=800&q=80',
+      location: 'Lavaux',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['couples', 'seniors', 'individual'],
+      experienceType: 'gastronomy',
+    },
+    {
+      id: 'pilatus-cable-car',
+      title: 'Mount Pilatus Cable Car',
+      description: 'Scenic cable car ride to Mount Pilatus with panoramic Alpine views.',
+      imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
+      location: 'Lucerne',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['seniors', 'families', 'couples'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'ballenberg-open-air',
+      title: 'Ballenberg Open-Air Museum',
+      description: 'Traditional Swiss rural architecture and crafts in a beautiful open-air setting.',
+      imageUrl: 'https://images.unsplash.com/photo-1566127444979-b3d2b6a90542?w=800&q=80',
+      location: 'Brienz',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['families', 'seniors', 'groups'],
+      experienceType: 'cultural',
+    },
+    {
+      id: 'aletsch-glacier',
+      title: 'Aletsch Glacier Viewing',
+      description: 'View the largest glacier in the Alps from accessible viewing platforms.',
+      imageUrl: 'https://images.unsplash.com/photo-1509556662326-d044e64e8a5d?w=800&q=80',
+      location: 'Valais',
+      duration: '2-4 hours',
+      difficulty: 'low',
+      suitableFor: ['seniors', 'families', 'couples'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'chocolate-train',
+      title: 'Swiss Chocolate Train',
+      description: 'Scenic train journey with visits to cheese dairy and chocolate factory.',
+      imageUrl: 'https://images.unsplash.com/photo-1474487548417-781cb71495f3?w=800&q=80',
+      location: 'Montreux to Gruyères',
+      duration: 'full day',
+      difficulty: 'low',
+      suitableFor: ['seniors', 'couples', 'families'],
+      experienceType: 'gastronomy',
+    },
+    {
+      id: 'zurich-lake-promenade',
+      title: 'Zürich Lake Promenade',
+      description: 'Leisurely walk along the beautiful Zürich lakeside with cafes and parks.',
+      imageUrl: 'https://images.unsplash.com/photo-1544551763-46a013bb70d5?w=800&q=80',
+      location: 'Zürich',
+      duration: 'less than 1 hour',
+      difficulty: 'low',
+      suitableFor: ['seniors', 'couples', 'families', 'individual'],
+      experienceType: 'outdoor',
+    },
+    {
+      id: 'basel-art-museum',
+      title: 'Kunstmuseum Basel',
+      description: 'One of Switzerland\'s most important art museums with works from the 15th century to today.',
+      imageUrl: 'https://images.unsplash.com/photo-1566127444979-b3d2b6a90542?w=800&q=80',
+      location: 'Basel',
+      duration: '1-2 hours',
+      difficulty: 'low',
+      suitableFor: ['couples', 'individual', 'seniors'],
+      experienceType: 'cultural',
+    },
   ];
 
   // Normalize filter values for comparison
   const normalizeValue = (value: string) => value?.toLowerCase().trim();
+  
+  // Map neededTime filter format to activity duration format
+  const normalizeTimeFilter = (filterTime: string): string => {
+    const timeMap: Record<string, string> = {
+      'lessthan1hour': 'less than 1 hour',
+      'between1_2hours': '1-2 hours',
+      'between2_4hours': '2-4 hours',
+      'between4_8hours': 'full day',
+      'morethan1day': 'multiple days'
+    };
+    return timeMap[filterTime] || filterTime;
+  };
 
   // Filter based on provided filters
   return mockData.filter(activity => {
@@ -186,8 +319,14 @@ function getMockActivities(filters: any): Activity[] {
     if (filters.experienceType) {
       const filterType = normalizeValue(filters.experienceType);
       const activityType = normalizeValue(activity.experienceType || '');
-      if (activityType !== filterType) {
-        return false;
+      if (activityType !== filterType && filterType !== 'culture' || (filterType === 'culture' && activityType !== 'cultural')) {
+        // Handle culture/cultural synonym
+        if (!(filterType === 'culture' && activityType === 'cultural') && 
+            !(filterType === 'cultural' && activityType === 'culture')) {
+          if (activityType !== filterType) {
+            return false;
+          }
+        }
       }
     }
 
@@ -204,16 +343,20 @@ function getMockActivities(filters: any): Activity[] {
     if (filters.suitableFor) {
       const filterSuitable = normalizeValue(filters.suitableFor);
       const activitySuitable = activity.suitableFor?.map(s => normalizeValue(s)) || [];
-      if (!activitySuitable.includes(filterSuitable)) {
+      // Handle family/families synonym
+      const matchesFilter = activitySuitable.includes(filterSuitable) ||
+        (filterSuitable === 'family' && activitySuitable.includes('families')) ||
+        (filterSuitable === 'families' && activitySuitable.includes('family'));
+      if (!matchesFilter) {
         return false;
       }
     }
 
-    // Needed time filter
+    // Needed time filter with proper mapping
     if (filters.neededTime) {
-      const filterTime = normalizeValue(filters.neededTime);
+      const normalizedFilterTime = normalizeValue(normalizeTimeFilter(filters.neededTime));
       const activityTime = normalizeValue(activity.duration || '');
-      if (activityTime !== filterTime) {
+      if (activityTime !== normalizedFilterTime) {
         return false;
       }
     }
