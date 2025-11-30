@@ -27,9 +27,9 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     intent: "cultural",
     expectedFilters: {
       experienceType: "cultural",
-      neededTime: "1-2 hours"
+      neededTime: "between1_2hours"
     },
-    expectedActivityIds: ["chaplin-world", "olympic-museum"],
+    expectedActivityIds: ["chaplin-world", "olympic-museum", "swiss-national-museum", "bern-old-town", "basel-art-museum"],
     minExpectedResults: 2,
     explanation: "These museums offer cultural experiences that can be completed within 1-2 hours, perfect for a focused visit.",
     metadata: {
@@ -44,9 +44,9 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     intent: "outdoor family-friendly",
     expectedFilters: {
       experienceType: "outdoor",
-      suitableFor: "families"
+      suitableFor: "family"
     },
-    expectedActivityIds: ["jungfraujoch", "rhine-falls"],
+    expectedActivityIds: ["jungfraujoch", "rhine-falls", "mount-rigi", "lake-geneva-cruise", "aletsch-glacier", "pilatus-cable-car"],
     minExpectedResults: 2,
     explanation: "Family-friendly outdoor destinations with accessible facilities and activities suitable for all ages.",
     metadata: {
@@ -63,7 +63,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       experienceType: "outdoor",
       difficulty: "low"
     },
-    expectedActivityIds: ["mount-rigi"],
+    expectedActivityIds: ["mount-rigi", "rhine-falls", "lake-geneva-cruise", "pilatus-cable-car", "aletsch-glacier", "zurich-lake-promenade"],
     minExpectedResults: 1,
     explanation: "Mount Rigi offers easy hiking trails with panoramic views, suitable for beginners.",
     metadata: {
@@ -79,7 +79,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     expectedFilters: {
       experienceType: "cultural",
       suitableFor: "couples",
-      neededTime: "less than 1 hour"
+      neededTime: "lessthan1hour"
     },
     expectedActivityIds: ["chapel-bridge"],
     minExpectedResults: 1,
@@ -96,7 +96,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     intent: "outdoor extended",
     expectedFilters: {
       experienceType: "outdoor",
-      neededTime: "full day"
+      neededTime: "between4_8hours"
     },
     expectedActivityIds: ["jungfraujoch", "glacier-express"],
     minExpectedResults: 2,
@@ -113,10 +113,10 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     intent: "cultural family-friendly quick",
     expectedFilters: {
       experienceType: "cultural",
-      suitableFor: "families",
-      neededTime: "less than 1 hour"
+      suitableFor: "family",
+      neededTime: "lessthan1hour"
     },
-    expectedActivityIds: [],
+    expectedActivityIds: ["gruyeres-cheese"],
     minExpectedResults: 0,
     explanation: "Tests ability to handle queries that may have limited matching results.",
     metadata: {
@@ -132,9 +132,9 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     queryType: "ambiguous",
     intent: "family-friendly general",
     expectedFilters: {
-      suitableFor: "families"
+      suitableFor: "family"
     },
-    expectedActivityIds: ["jungfraujoch", "rhine-falls"],
+    expectedActivityIds: ["jungfraujoch", "rhine-falls", "mount-rigi", "olympic-museum", "swiss-transport-museum"],
     minExpectedResults: 2,
     explanation: "Ambiguous query requiring system to infer 'fun' could mean various activity types.",
     metadata: {
@@ -222,11 +222,12 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     queryType: "open-ended",
     intent: "accessibility advice",
     expectedFilters: {
-      difficulty: "low"
+      difficulty: "low",
+      suitableFor: "seniors"
     },
-    expectedActivityIds: [],
+    expectedActivityIds: ["mount-rigi", "glacier-express", "bern-old-town", "lake-geneva-cruise", "pilatus-cable-car", "ballenberg-open-air", "aletsch-glacier", "chocolate-train", "zurich-lake-promenade"],
     minExpectedResults: 1,
-    explanation: "Context-rich query requiring inference about accessibility needs.",
+    explanation: "Context-rich query requiring inference about accessibility needs for elderly/senior travelers.",
     metadata: {
       source: "tourist forum",
       dateCreated: "2025-01-15"

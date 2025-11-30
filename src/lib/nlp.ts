@@ -24,15 +24,17 @@ const NEEDED_TIME = {
 };
 
 const DIFFICULTY = {
-  low: ['easy', 'simple', 'not difficult', 'not too difficult', 'beginner'],
-  medium: ['moderate', 'medium', 'average'],
-  high: ['difficult', 'challenging', 'hard', 'advanced'],
+  low: ['easy', 'simple', 'not difficult', 'not too difficult', 'beginner', 'accessible', 'gentle', 'relaxed', 'leisurely', 'light'],
+  medium: ['moderate', 'medium', 'average', 'intermediate'],
+  high: ['difficult', 'challenging', 'hard', 'advanced', 'strenuous', 'demanding'],
 };
 
 const SUITABLE_FOR = {
-  family: ['family', 'families', 'kids', 'children'],
-  groups: ['group', 'groups', 'team'],
-  individual: ['solo', 'individual', 'alone'],
+  family: ['family', 'families', 'kids', 'children', 'kid', 'child'],
+  groups: ['group', 'groups', 'team', 'teams'],
+  individual: ['solo', 'individual', 'alone', 'myself'],
+  seniors: ['elderly', 'senior', 'seniors', 'older', 'grandparents', 'retired', 'elder'],
+  couples: ['couple', 'couples', 'romantic', 'romance', 'partner', 'date', 'honeymoon'],
 };
 
 export function parseQuery(query: string): ParsedQuery {
