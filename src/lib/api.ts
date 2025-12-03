@@ -319,14 +319,11 @@ function getMockActivities(filters: any): Activity[] {
     if (filters.experienceType) {
       const filterType = normalizeValue(filters.experienceType);
       const activityType = normalizeValue(activity.experienceType || '');
-      if (activityType !== filterType && filterType !== 'culture' || (filterType === 'culture' && activityType !== 'cultural')) {
-        // Handle culture/cultural synonym
-        if (!(filterType === 'culture' && activityType === 'cultural') && 
-            !(filterType === 'cultural' && activityType === 'culture')) {
-          if (activityType !== filterType) {
-            return false;
-          }
-        }
+      // Handle culture/cultural synonym
+      const normalizedFilter = filterType === 'culture' ? 'cultural' : filterType;
+      const normalizedActivity = activityType === 'culture' ? 'cultural' : activityType;
+      if (normalizedActivity !== normalizedFilter) {
+        return false;
       }
     }
 
