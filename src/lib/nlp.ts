@@ -8,9 +8,9 @@ export interface ParsedQuery {
 }
 
 const EXPERIENCE_TYPES = {
-  culture: ['cultural', 'culture', 'museum', 'art', 'history', 'historic'],
-  outdoor: ['outdoor', 'nature', 'hiking', 'mountain', 'alpine', 'skiing', 'biking'],
-  gastronomy: ['food', 'dining', 'restaurant', 'culinary', 'wine', 'cheese'],
+  cultural: ['cultural', 'culture', 'museum', 'art', 'history', 'historic', 'heritage'],
+  outdoor: ['outdoor', 'nature', 'hiking', 'mountain', 'alpine', 'skiing', 'biking', 'adventure'],
+  gastronomy: ['food', 'dining', 'restaurant', 'culinary', 'wine', 'cheese', 'gastronomy', 'chocolate'],
   shopping: ['shopping', 'shop', 'boutique', 'market'],
   wellness: ['wellness', 'spa', 'relax', 'thermal'],
 };
