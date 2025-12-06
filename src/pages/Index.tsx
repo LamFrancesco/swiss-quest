@@ -1,13 +1,17 @@
 import { useState } from 'react';
-import { Mountain, BarChart, GitCompare } from 'lucide-react';
+import { Mountain, BarChart, GitCompare, Bot, Cpu } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery } from '@/lib/nlp';
+import { parseQueryWithLLM } from '@/lib/nlpLLM';
 import { searchActivities, Activity } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { runFullEvaluation } from '@/lib/metrics';
 import { runModelComparison } from '@/lib/metricsComparison';
+import { Toggle } from '@/components/ui/toggle';
+
+export type ModelType = 'fuzzy' | 'llm';
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -15,6 +19,7 @@ const Index = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [comparing, setComparing] = useState(false);
+  const [activeModel, setActiveModel] = useState<ModelType>('fuzzy');
 
   const handleRunComparison = async () => {
     setComparing(true);
@@ -69,8 +74,17 @@ const Index = () => {
     setLoading(true);
 
     try {
-      // Parse natural language query
-      const parsed = parseQuery(query);
+      // Parse natural language query based on selected model
+      let parsed;
+      const startTime = performance.now();
+      
+      if (activeModel === 'llm') {
+        parsed = await parseQueryWithLLM(query);
+      } else {
+        parsed = parseQuery(query);
+      }
+      
+      const latency = performance.now() - startTime;
       
       // Always show what we understood with filters
       if (parsed.experienceType || parsed.neededTime || parsed.difficulty || parsed.suitableFor) {
@@ -83,6 +97,8 @@ const Index = () => {
             difficulty: parsed.difficulty,
             suitableFor: parsed.suitableFor,
           },
+          model: activeModel,
+          latency: Math.round(latency),
         };
         setMessages(prev => [...prev, understandingMessage]);
       }
@@ -139,27 +155,51 @@ const Index = () => {
             <span className="font-bold text-lg">SwissQuest</span>
           </div>
           <div className="flex items-center gap-4">
+            {/* Model Toggle */}
+            <div className="flex items-center gap-1 bg-muted rounded-lg p-1">
+              <Toggle
+                pressed={activeModel === 'fuzzy'}
+                onPressedChange={() => setActiveModel('fuzzy')}
+                size="sm"
+                className="gap-1.5 data-[state=on]:bg-background"
+              >
+                <Cpu className="h-3.5 w-3.5" />
+                Fuzzy
+              </Toggle>
+              <Toggle
+                pressed={activeModel === 'llm'}
+                onPressedChange={() => setActiveModel('llm')}
+                size="sm"
+                className="gap-1.5 data-[state=on]:bg-background"
+              >
+                <Bot className="h-3.5 w-3.5" />
+                LLM
+              </Toggle>
+            </div>
+            
+            <div className="h-4 w-px bg-border" />
+            
             <Button 
               onClick={handleRunComparison}
-              disabled={comparing || evaluating}
+              disabled={comparing || evaluating || loading}
               variant="default"
               size="sm"
               className="gap-2"
             >
               <GitCompare className="h-4 w-4" />
-              {comparing ? "Comparing..." : "Compare Models"}
+              {comparing ? "Comparing..." : "Compare"}
             </Button>
             <Button 
               onClick={handleRunEvaluation}
-              disabled={evaluating || comparing}
+              disabled={evaluating || comparing || loading}
               variant="outline"
               size="sm"
               className="gap-2"
             >
               <BarChart className="h-4 w-4" />
-              {evaluating ? "Evaluating..." : "Fuzzy Only"}
+              {evaluating ? "Evaluating..." : "Eval Fuzzy"}
             </Button>
-            <div className="text-muted-foreground text-sm">
+            <div className="text-muted-foreground text-sm hidden md:block">
               Powered by MySwitzerland
             </div>
           </div>

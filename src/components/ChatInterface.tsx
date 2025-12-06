@@ -16,6 +16,8 @@ interface Message {
     difficulty?: string;
     suitableFor?: string;
   };
+  model?: 'fuzzy' | 'llm';
+  latency?: number;
 }
 
 interface ChatInterfaceProps {
@@ -90,6 +92,9 @@ const ChatInterface = ({ messages, onSendMessage, onActivityClick, loading }: Ch
                 type={message.type}
                 content={message.content}
                 activities={message.activities}
+                filters={message.filters}
+                model={message.model}
+                latency={message.latency}
                 onActivityClick={onActivityClick}
               />
             ))}

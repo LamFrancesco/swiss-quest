@@ -1,4 +1,4 @@
-import { Bot, User } from 'lucide-react';
+import { Bot, User, Cpu, Sparkles } from 'lucide-react';
 import { Activity } from '@/lib/api';
 import ActivityCard from './ActivityCard';
 import { Badge } from './ui/badge';
@@ -13,10 +13,12 @@ interface ChatMessageProps {
     difficulty?: string;
     suitableFor?: string;
   };
+  model?: 'fuzzy' | 'llm';
+  latency?: number;
   onActivityClick?: (activity: Activity) => void;
 }
 
-const ChatMessage = ({ type, content, activities, filters, onActivityClick }: ChatMessageProps) => {
+const ChatMessage = ({ type, content, activities, filters, model, latency, onActivityClick }: ChatMessageProps) => {
   const getFilterLabel = (key: string, value: string) => {
     const labels: Record<string, Record<string, string>> = {
       experienceType: {
@@ -73,6 +75,30 @@ const ChatMessage = ({ type, content, activities, filters, onActivityClick }: Ch
           <Bot className="h-4 w-4 text-primary" />
         </div>
         <div className="bg-accent px-4 py-3 rounded-2xl rounded-tl-sm max-w-[85%]">
+          {/* Model indicator */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+              model === 'llm' 
+                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' 
+                : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+            }`}>
+              {model === 'llm' ? (
+                <>
+                  <Sparkles className="h-3 w-3" />
+                  LLM
+                </>
+              ) : (
+                <>
+                  <Cpu className="h-3 w-3" />
+                  Fuzzy
+                </>
+              )}
+            </div>
+            {latency !== undefined && (
+              <span className="text-xs text-muted-foreground">{latency}ms</span>
+            )}
+          </div>
+          
           <p className="text-sm text-foreground mb-3">
             I understood that you're looking for something:
           </p>
