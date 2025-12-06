@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Mountain, BarChart } from 'lucide-react';
+import { Mountain, BarChart, GitCompare } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery } from '@/lib/nlp';
@@ -7,12 +7,35 @@ import { searchActivities, Activity } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { runFullEvaluation } from '@/lib/metrics';
+import { runModelComparison } from '@/lib/metricsComparison';
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [evaluating, setEvaluating] = useState(false);
+  const [comparing, setComparing] = useState(false);
+
+  const handleRunComparison = async () => {
+    setComparing(true);
+    toast.info("Starting model comparison...", {
+      description: "Comparing Fuzzy Logic vs LLM - check console for results"
+    });
+    
+    try {
+      const report = await runModelComparison();
+      toast.success("Comparison complete!", {
+        description: `Fuzzy: P=${(report.fuzzyAverages.avgPrecision * 100).toFixed(0)}% R=${(report.fuzzyAverages.avgRecall * 100).toFixed(0)}% | LLM: P=${(report.llmAverages.avgPrecision * 100).toFixed(0)}% R=${(report.llmAverages.avgRecall * 100).toFixed(0)}%`
+      });
+    } catch (error) {
+      console.error("Comparison failed:", error);
+      toast.error("Comparison failed", {
+        description: "Check the console for error details"
+      });
+    } finally {
+      setComparing(false);
+    }
+  };
 
   const handleRunEvaluation = async () => {
     setEvaluating(true);
@@ -117,14 +140,24 @@ const Index = () => {
           </div>
           <div className="flex items-center gap-4">
             <Button 
+              onClick={handleRunComparison}
+              disabled={comparing || evaluating}
+              variant="default"
+              size="sm"
+              className="gap-2"
+            >
+              <GitCompare className="h-4 w-4" />
+              {comparing ? "Comparing..." : "Compare Models"}
+            </Button>
+            <Button 
               onClick={handleRunEvaluation}
-              disabled={evaluating}
+              disabled={evaluating || comparing}
               variant="outline"
               size="sm"
               className="gap-2"
             >
               <BarChart className="h-4 w-4" />
-              {evaluating ? "Evaluating..." : "Run Evaluation"}
+              {evaluating ? "Evaluating..." : "Fuzzy Only"}
             </Button>
             <div className="text-muted-foreground text-sm">
               Powered by MySwitzerland
