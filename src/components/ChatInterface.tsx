@@ -7,7 +7,7 @@ import { Activity } from '@/lib/api';
 
 interface Message {
   id: string;
-  type: 'user' | 'assistant' | 'activities' | 'understanding';
+  type: 'user' | 'assistant' | 'activities' | 'understanding' | 'comparison';
   content?: string;
   activities?: Activity[];
   filters?: {
@@ -16,8 +16,26 @@ interface Message {
     difficulty?: string;
     suitableFor?: string;
   };
-  model?: 'fuzzy' | 'llm';
+  model?: 'fuzzy' | 'llm' | 'compare';
   latency?: number;
+  fuzzyResult?: {
+    filters: {
+      experienceType?: string;
+      neededTime?: string;
+      difficulty?: string;
+      suitableFor?: string;
+    };
+    latency: number;
+  };
+  llmResult?: {
+    filters: {
+      experienceType?: string;
+      neededTime?: string;
+      difficulty?: string;
+      suitableFor?: string;
+    };
+    latency: number;
+  };
 }
 
 interface ChatInterfaceProps {
@@ -95,6 +113,8 @@ const ChatInterface = ({ messages, onSendMessage, onActivityClick, loading }: Ch
                 filters={message.filters}
                 model={message.model}
                 latency={message.latency}
+                fuzzyResult={message.fuzzyResult}
+                llmResult={message.llmResult}
                 onActivityClick={onActivityClick}
               />
             ))}
