@@ -11,7 +11,7 @@ import { runFullEvaluation } from '@/lib/metrics';
 import { runModelComparison } from '@/lib/metricsComparison';
 import { Toggle } from '@/components/ui/toggle';
 
-export type ModelType = 'fuzzy' | 'llm';
+export type ModelType = 'fuzzy' | 'llm' | 'compare';
 
 const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -74,61 +74,123 @@ const Index = () => {
     setLoading(true);
 
     try {
-      // Parse natural language query based on selected model
-      let parsed;
-      const startTime = performance.now();
-      
-      if (activeModel === 'llm') {
-        parsed = await parseQueryWithLLM(query);
-      } else {
-        parsed = parseQuery(query);
-      }
-      
-      const latency = performance.now() - startTime;
-      
-      // Always show what we understood with filters
-      if (parsed.experienceType || parsed.neededTime || parsed.difficulty || parsed.suitableFor) {
-        const understandingMessage: Message = {
-          id: `understanding-${Date.now()}`,
-          type: 'understanding',
-          filters: {
-            experienceType: parsed.experienceType,
-            neededTime: parsed.neededTime,
-            difficulty: parsed.difficulty,
-            suitableFor: parsed.suitableFor,
+      if (activeModel === 'compare') {
+        // Run both models in parallel for comparison
+        const startFuzzy = performance.now();
+        const fuzzyParsed = parseQuery(query);
+        const fuzzyLatency = performance.now() - startFuzzy;
+
+        const startLLM = performance.now();
+        const llmParsed = await parseQueryWithLLM(query);
+        const llmLatency = performance.now() - startLLM;
+
+        // Add comparison message showing both results side-by-side
+        const comparisonMessage: Message = {
+          id: `comparison-${Date.now()}`,
+          type: 'comparison',
+          fuzzyResult: {
+            filters: {
+              experienceType: fuzzyParsed.experienceType,
+              neededTime: fuzzyParsed.neededTime,
+              difficulty: fuzzyParsed.difficulty,
+              suitableFor: fuzzyParsed.suitableFor,
+            },
+            latency: Math.round(fuzzyLatency),
           },
-          model: activeModel,
-          latency: Math.round(latency),
+          llmResult: {
+            filters: {
+              experienceType: llmParsed.experienceType,
+              neededTime: llmParsed.neededTime,
+              difficulty: llmParsed.difficulty,
+              suitableFor: llmParsed.suitableFor,
+            },
+            latency: Math.round(llmLatency),
+          },
         };
-        setMessages(prev => [...prev, understandingMessage]);
-      }
+        setMessages(prev => [...prev, comparisonMessage]);
 
-      // Search activities
-      const results = await searchActivities({
-        experienceType: parsed.experienceType,
-        neededTime: parsed.neededTime,
-        difficulty: parsed.difficulty,
-        suitableFor: parsed.suitableFor,
-        query,
-      });
+        // Use LLM result for search (typically more accurate for complex queries)
+        const results = await searchActivities({
+          experienceType: llmParsed.experienceType,
+          neededTime: llmParsed.neededTime,
+          difficulty: llmParsed.difficulty,
+          suitableFor: llmParsed.suitableFor,
+          query,
+        });
 
-      // Limit results to 5-7 activities
-      const limitedResults = results.slice(0, 7);
-
-      if (limitedResults.length === 0) {
-        const noResultsMessage: Message = {
-          id: `assistant-${Date.now()}-no-results`,
-          type: 'assistant',
-          content: "I couldn't find any activities matching those criteria. Try adjusting your search or ask me for something different!",
-        };
-        setMessages(prev => [...prev, noResultsMessage]);
+        const limitedResults = results.slice(0, 7);
+        if (limitedResults.length === 0) {
+          const noResultsMessage: Message = {
+            id: `assistant-${Date.now()}-no-results`,
+            type: 'assistant',
+            content: "I couldn't find any activities matching those criteria. Try adjusting your search!",
+          };
+          setMessages(prev => [...prev, noResultsMessage]);
+        } else {
+          const activitiesMessage: Message = {
+            id: `activities-${Date.now()}`,
+            type: 'activities',
+            activities: limitedResults,
+          };
+          setMessages(prev => [...prev, activitiesMessage]);
+        }
       } else {
-        const activitiesMessage: Message = {
-          id: `activities-${Date.now()}`,
-          type: 'activities',
-          activities: limitedResults,
-        };
-        setMessages(prev => [...prev, activitiesMessage]);
+        // Single model mode
+        let parsed;
+        const startTime = performance.now();
+        
+        if (activeModel === 'llm') {
+          parsed = await parseQueryWithLLM(query);
+        } else {
+          parsed = parseQuery(query);
+        }
+        
+        const latency = performance.now() - startTime;
+        
+        // Always show what we understood with filters
+        if (parsed.experienceType || parsed.neededTime || parsed.difficulty || parsed.suitableFor) {
+          const understandingMessage: Message = {
+            id: `understanding-${Date.now()}`,
+            type: 'understanding',
+            filters: {
+              experienceType: parsed.experienceType,
+              neededTime: parsed.neededTime,
+              difficulty: parsed.difficulty,
+              suitableFor: parsed.suitableFor,
+            },
+            model: activeModel,
+            latency: Math.round(latency),
+          };
+          setMessages(prev => [...prev, understandingMessage]);
+        }
+
+        // Search activities
+        const results = await searchActivities({
+          experienceType: parsed.experienceType,
+          neededTime: parsed.neededTime,
+          difficulty: parsed.difficulty,
+          suitableFor: parsed.suitableFor,
+          query,
+        });
+
+        // Limit results to 5-7 activities
+        const limitedResults = results.slice(0, 7);
+
+        if (limitedResults.length === 0) {
+          const noResultsMessage: Message = {
+            id: `assistant-${Date.now()}-no-results`,
+            type: 'assistant',
+            content: "I couldn't find any activities matching those criteria. Try adjusting your search or ask me for something different!",
+          };
+          setMessages(prev => [...prev, noResultsMessage]);
+        } else {
+          const activitiesMessage: Message = {
+            id: `activities-${Date.now()}`,
+            type: 'activities',
+            activities: limitedResults,
+          };
+          setMessages(prev => [...prev, activitiesMessage]);
+        }
       }
     } catch (error) {
       const errorMessage: Message = {
@@ -174,6 +236,15 @@ const Index = () => {
               >
                 <Bot className="h-3.5 w-3.5" />
                 LLM
+              </Toggle>
+              <Toggle
+                pressed={activeModel === 'compare'}
+                onPressedChange={() => setActiveModel('compare')}
+                size="sm"
+                className="gap-1.5 data-[state=on]:bg-background data-[state=on]:text-primary"
+              >
+                <GitCompare className="h-3.5 w-3.5" />
+                Compare
               </Toggle>
             </div>
             

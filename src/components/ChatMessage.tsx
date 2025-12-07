@@ -1,10 +1,20 @@
-import { Bot, User, Cpu, Sparkles } from 'lucide-react';
+import { Bot, User, Cpu, Sparkles, GitCompare } from 'lucide-react';
 import { Activity } from '@/lib/api';
 import ActivityCard from './ActivityCard';
 import { Badge } from './ui/badge';
 
+interface FilterResult {
+  filters: {
+    experienceType?: string;
+    neededTime?: string;
+    difficulty?: string;
+    suitableFor?: string;
+  };
+  latency: number;
+}
+
 interface ChatMessageProps {
-  type: 'user' | 'assistant' | 'activities' | 'understanding';
+  type: 'user' | 'assistant' | 'activities' | 'understanding' | 'comparison';
   content?: string;
   activities?: Activity[];
   filters?: {
@@ -13,12 +23,14 @@ interface ChatMessageProps {
     difficulty?: string;
     suitableFor?: string;
   };
-  model?: 'fuzzy' | 'llm';
+  model?: 'fuzzy' | 'llm' | 'compare';
   latency?: number;
+  fuzzyResult?: FilterResult;
+  llmResult?: FilterResult;
   onActivityClick?: (activity: Activity) => void;
 }
 
-const ChatMessage = ({ type, content, activities, filters, model, latency, onActivityClick }: ChatMessageProps) => {
+const ChatMessage = ({ type, content, activities, filters, model, latency, fuzzyResult, llmResult, onActivityClick }: ChatMessageProps) => {
   const getFilterLabel = (key: string, value: string) => {
     const labels: Record<string, Record<string, string>> = {
       experienceType: {
@@ -123,6 +135,75 @@ const ChatMessage = ({ type, content, activities, filters, model, latency, onAct
                 {getFilterLabel('difficulty', filters.difficulty)}
               </Badge>
             )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (type === 'comparison' && fuzzyResult && llmResult) {
+    const renderFilterBadges = (result: FilterResult) => (
+      <div className="flex flex-wrap gap-1.5">
+        {result.filters.experienceType && (
+          <Badge variant="default" className="text-xs">
+            {getFilterLabel('experienceType', result.filters.experienceType)}
+          </Badge>
+        )}
+        {result.filters.suitableFor && (
+          <Badge variant="secondary" className="text-xs">
+            for {getFilterLabel('suitableFor', result.filters.suitableFor)}
+          </Badge>
+        )}
+        {result.filters.neededTime && (
+          <Badge variant="secondary" className="text-xs">
+            {getFilterLabel('neededTime', result.filters.neededTime)}
+          </Badge>
+        )}
+        {result.filters.difficulty && (
+          <Badge variant="outline" className="text-xs">
+            {getFilterLabel('difficulty', result.filters.difficulty)}
+          </Badge>
+        )}
+        {!result.filters.experienceType && !result.filters.suitableFor && 
+         !result.filters.neededTime && !result.filters.difficulty && (
+          <span className="text-xs text-muted-foreground italic">No filters detected</span>
+        )}
+      </div>
+    );
+
+    return (
+      <div className="flex gap-3">
+        <div className="h-8 w-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0">
+          <GitCompare className="h-4 w-4 text-primary" />
+        </div>
+        <div className="bg-accent px-4 py-3 rounded-2xl rounded-tl-sm max-w-[90%] w-full">
+          <p className="text-sm text-foreground mb-3">
+            Side-by-side comparison of how each model parsed your query:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Fuzzy Result */}
+            <div className="bg-background/50 rounded-lg p-3 border border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">
+                  <Cpu className="h-3 w-3" />
+                  Fuzzy
+                </div>
+                <span className="text-xs text-muted-foreground">{fuzzyResult.latency}ms</span>
+              </div>
+              {renderFilterBadges(fuzzyResult)}
+            </div>
+            
+            {/* LLM Result */}
+            <div className="bg-background/50 rounded-lg p-3 border border-border">
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                  <Sparkles className="h-3 w-3" />
+                  LLM
+                </div>
+                <span className="text-xs text-muted-foreground">{llmResult.latency}ms</span>
+              </div>
+              {renderFilterBadges(llmResult)}
+            </div>
           </div>
         </div>
       </div>
