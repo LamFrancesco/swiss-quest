@@ -9,24 +9,67 @@ const SYSTEM_PROMPT = `You are a Swiss tourism query parser. Extract structured 
 
 You MUST respond with ONLY a valid JSON object with these optional fields:
 - experienceType: one of "cultural", "outdoor", "gastronomy", "shopping", "wellness" (or null if not applicable)
+  - Map "history", "museum", "art" to "cultural"
+  - Map "hike", "walk", "mountain", "nature" to "outdoor"
+  - Map "food", "restaurant", "dinner", "eat" to "gastronomy"
 - neededTime: one of "lessthan1hour", "between1_2hours", "between2_4hours", "between4_8hours", "morethan1day" (or null if not applicable)
+  - Map "quick", "short" to "lessthan1hour"
+  - Map "half day", "few hours" to "between2_4hours"
+  - Map "all day", "full day" to "between4_8hours"
+  - Map "multi-day", "weekend" to "morethan1day"
 - difficulty: one of "low", "medium", "high" (or null if not applicable)
+  - Map "easy", "simple", "relaxing" to "low"
+  - Map "moderate" to "medium"
+  - Map "hard", "challenging", "difficult" to "high"
 - suitableFor: one of "family", "groups", "individual", "seniors", "couples" (or null if not applicable)
-
-Examples:
-Query: "I want a quick cultural activity for families"
-Response: {"experienceType":"cultural","neededTime":"lessthan1hour","difficulty":null,"suitableFor":"family"}
-
-Query: "challenging mountain hike for the whole day"
-Response: {"experienceType":"outdoor","neededTime":"between4_8hours","difficulty":"high","suitableFor":null}
-
-Query: "romantic dinner options"
-Response: {"experienceType":"gastronomy","neededTime":null,"difficulty":null,"suitableFor":"couples"}
-
-Query: "easy walk suitable for elderly visitors, about 2 hours"
-Response: {"experienceType":"outdoor","neededTime":"between1_2hours","difficulty":"low","suitableFor":"seniors"}
+  - Map "elderly", "grandparents", "older" to "seniors"
+  - Map "kids", "children" to "family"
+  - Map "romantic", "date" to "couples"
+  - Map "solo", "alone" to "individual"
 
 IMPORTANT: Output ONLY the JSON object, no markdown, no explanation.`;
+
+function getFallbackFilters(query: string): {
+  experienceType?: string;
+  neededTime?: string;
+  difficulty?: string;
+  suitableFor?: string;
+} {
+  const lowerQuery = query.toLowerCase();
+  const filters: Record<string, string> = {};
+
+  if (lowerQuery.includes("cultural") || lowerQuery.includes("museum") || lowerQuery.includes("history")) {
+    filters.experienceType = "cultural";
+  } else if (lowerQuery.includes("outdoor") || lowerQuery.includes("hike") || lowerQuery.includes("walk")) {
+    filters.experienceType = "outdoor";
+  } else if (lowerQuery.includes("food") || lowerQuery.includes("restaurant") || lowerQuery.includes("dinner")) {
+    filters.experienceType = "gastronomy";
+  }
+
+  if (lowerQuery.includes("elderly") || lowerQuery.includes("grandparents") || lowerQuery.includes("seniors")) {
+    filters.suitableFor = "seniors";
+  } else if (lowerQuery.includes("family") || lowerQuery.includes("kids")) {
+    filters.suitableFor = "family";
+  } else if (lowerQuery.includes("couple") || lowerQuery.includes("romantic")) {
+    filters.suitableFor = "couples";
+  }
+
+  if (lowerQuery.includes("easy") || lowerQuery.includes("simple") || lowerQuery.includes("relaxing")) {
+    filters.difficulty = "low";
+  } else if (lowerQuery.includes("hard") || lowerQuery.includes("challenging")) {
+    filters.difficulty = "high";
+  }
+
+  if (lowerQuery.includes("quick") || lowerQuery.includes("short")) {
+    filters.neededTime = "lessthan1hour";
+  } else if (lowerQuery.includes("half day")) {
+    filters.neededTime = "between2_4hours";
+  } else if (lowerQuery.includes("all day") || lowerQuery.includes("full day")) {
+    filters.neededTime = "between4_8hours";
+  }
+
+  return filters;
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -35,7 +78,7 @@ serve(async (req) => {
 
   try {
     const { query } = await req.json();
-    
+
     if (!query || typeof query !== 'string') {
       return new Response(
         JSON.stringify({ error: 'Query is required' }),
@@ -85,27 +128,20 @@ serve(async (req) => {
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
-    
+
     console.log(`[parse-query-llm] Raw LLM response: ${content}`);
 
     // Parse the JSON response from the LLM
     let parsed;
     try {
-      // Clean up potential markdown formatting
       const cleanContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       parsed = JSON.parse(cleanContent);
     } catch (parseError) {
-      console.error(`[parse-query-llm] Failed to parse LLM response as JSON:`, content);
-      // Return empty filters if parsing fails
-      parsed = {
-        experienceType: null,
-        neededTime: null,
-        difficulty: null,
-        suitableFor: null
-      };
+      console.error(`[parse-query-llm] Failed to parse LLM response as JSON, using fallback`);
+      parsed = getFallbackFilters(query);
     }
 
-    // Validate and normalize the response
+    // Validate against allowed values
     const validExperienceTypes = ["cultural", "outdoor", "gastronomy", "shopping", "wellness"];
     const validNeededTime = ["lessthan1hour", "between1_2hours", "between2_4hours", "between4_8hours", "morethan1day"];
     const validDifficulty = ["low", "medium", "high"];
