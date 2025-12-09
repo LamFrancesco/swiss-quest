@@ -1,5 +1,11 @@
-// Semantic NLP using TF-IDF for improved matching
+// Semantic NLP using TF-IDF + Word Embeddings for improved matching
 import { buildCorpus, queryToTFIDF, findBestMatch, type TFIDFCorpus } from './tfidf';
+import { 
+  initEmbeddings, 
+  findBestMatchWithEmbeddings, 
+  isEmbeddingsReady, 
+  getEmbeddingsStatus 
+} from './embeddings';
 
 export interface ParsedQuery {
   experienceType?: string;
@@ -8,6 +14,9 @@ export interface ParsedQuery {
   suitableFor?: string;
   keywords: string[];
 }
+
+// Flag to track if we should use embeddings
+let useEmbeddings = true;
 
 // Extended category definitions with richer semantic descriptions (include word variations for stemming)
 const EXPERIENCE_TYPE_DOCS = [
@@ -56,8 +65,8 @@ function initCorpora() {
   }
 }
 
-// Match query against a corpus with confidence threshold
-function matchCategory(
+// Match query against a corpus with confidence threshold (TF-IDF fallback)
+function matchCategoryTFIDF(
   query: string,
   corpus: TFIDFCorpus,
   threshold: number = 0.08,
@@ -73,30 +82,55 @@ function matchCategory(
   return { id: match?.id, score: match?.score || 0 };
 }
 
-export function parseQuerySemantic(query: string): ParsedQuery {
+// Match using embeddings with TF-IDF fallback
+async function matchCategory(
+  query: string,
+  corpus: TFIDFCorpus,
+  categoryType: 'experienceType' | 'neededTime' | 'difficulty' | 'suitableFor',
+  tfidfThreshold: number = 0.08
+): Promise<{ id: string | undefined; score: number; method: string }> {
+  
+  // Try embeddings first if available
+  if (useEmbeddings && isEmbeddingsReady()) {
+    const embeddingMatch = await findBestMatchWithEmbeddings(query, categoryType, 0.3);
+    if (embeddingMatch) {
+      console.log(`[Embeddings] ${categoryType}: matched "${embeddingMatch.id}" (score: ${embeddingMatch.score.toFixed(3)})`);
+      return { id: embeddingMatch.id, score: embeddingMatch.score, method: 'embeddings' };
+    }
+  }
+  
+  // Fallback to TF-IDF
+  const tfidfMatch = matchCategoryTFIDF(query, corpus, tfidfThreshold, categoryType);
+  return { ...tfidfMatch, method: 'tfidf' };
+}
+
+// Async version using embeddings
+export async function parseQuerySemanticAsync(query: string): Promise<ParsedQuery> {
   initCorpora();
   
-  console.log(`\n[TF-IDF Semantic Parser] Processing: "${query}"`);
+  const status = getEmbeddingsStatus();
+  console.log(`\n[Semantic Parser] Processing: "${query}" (embeddings: ${status})`);
   
   const result: ParsedQuery = {
     keywords: [],
   };
 
-  // Use TF-IDF semantic matching for each category
-  const expMatch = matchCategory(query, experienceCorpus, 0.08, 'experienceType');
+  // Use async matching with embeddings
+  const [expMatch, timeMatch, diffMatch, suitableMatch] = await Promise.all([
+    matchCategory(query, experienceCorpus, 'experienceType', 0.08),
+    matchCategory(query, timeCorpus, 'neededTime', 0.1),
+    matchCategory(query, difficultyCorpus, 'difficulty', 0.1),
+    matchCategory(query, suitableCorpus, 'suitableFor', 0.08),
+  ]);
+
   result.experienceType = expMatch.id;
-  const timeMatch = matchCategory(query, timeCorpus, 0.1, 'neededTime');
   result.neededTime = timeMatch.id;
-  
-  const diffMatch = matchCategory(query, difficultyCorpus, 0.1, 'difficulty');
   result.difficulty = diffMatch.id;
-  
-  const suitableMatch = matchCategory(query, suitableCorpus, 0.08, 'suitableFor');
   result.suitableFor = suitableMatch.id;
   
-  console.log('[TF-IDF] Final parsed result:', result);
+  console.log('[Semantic Parser] Final result:', result);
 
-  // Extract keywords (words longer than 3 chars, excluding common stop words)
+  // Extract keywords
   const stopWords = new Set([
     'want', 'looking', 'find', 'need', 'would', 'like', 'please', 'show',
     'give', 'what', 'where', 'when', 'which', 'that', 'this', 'with',
@@ -111,6 +145,65 @@ export function parseQuerySemantic(query: string): ParsedQuery {
     .filter(word => word.length > 3 && !stopWords.has(word));
 
   return result;
+}
+
+// Sync version using TF-IDF only (for backward compatibility)
+export function parseQuerySemantic(query: string): ParsedQuery {
+  initCorpora();
+  
+  console.log(`\n[TF-IDF Semantic Parser] Processing: "${query}"`);
+  
+  const result: ParsedQuery = {
+    keywords: [],
+  };
+
+  // Use TF-IDF matching only
+  const expMatch = matchCategoryTFIDF(query, experienceCorpus, 0.08, 'experienceType');
+  result.experienceType = expMatch.id;
+  
+  const timeMatch = matchCategoryTFIDF(query, timeCorpus, 0.1, 'neededTime');
+  result.neededTime = timeMatch.id;
+  
+  const diffMatch = matchCategoryTFIDF(query, difficultyCorpus, 0.1, 'difficulty');
+  result.difficulty = diffMatch.id;
+  
+  const suitableMatch = matchCategoryTFIDF(query, suitableCorpus, 0.08, 'suitableFor');
+  result.suitableFor = suitableMatch.id;
+  
+  console.log('[TF-IDF] Final parsed result:', result);
+
+  const stopWords = new Set([
+    'want', 'looking', 'find', 'need', 'would', 'like', 'please', 'show',
+    'give', 'what', 'where', 'when', 'which', 'that', 'this', 'with',
+    'from', 'have', 'some', 'about', 'more', 'very', 'just', 'also',
+    'into', 'them', 'than', 'been', 'could', 'should', 'would', 'there',
+    'their', 'will', 'each', 'make', 'can', 'the', 'and', 'for'
+  ]);
+  
+  result.keywords = query
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !stopWords.has(word));
+
+  return result;
+}
+
+// Initialize embeddings (call on app start)
+export async function initSemanticParser(): Promise<boolean> {
+  console.log('[Semantic Parser] Initializing embeddings...');
+  const success = await initEmbeddings();
+  if (success) {
+    console.log('[Semantic Parser] Embeddings ready - using transformer model');
+  } else {
+    console.log('[Semantic Parser] Falling back to TF-IDF');
+  }
+  return success;
+}
+
+// Toggle embeddings usage
+export function setUseEmbeddings(use: boolean): void {
+  useEmbeddings = use;
+  console.log(`[Semantic Parser] Embeddings ${use ? 'enabled' : 'disabled'}`);
 }
 
 // Export for testing/debugging

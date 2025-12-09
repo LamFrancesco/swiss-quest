@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Mountain, BarChart, GitCompare, Bot, Cpu } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Mountain, BarChart, GitCompare, Bot, Cpu, Sparkles } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
-import { parseQuery } from '@/lib/nlp';
+import { parseQuery, parseQueryAsync, initSemanticParser } from '@/lib/nlp';
 import { parseQueryWithLLM } from '@/lib/nlpLLM';
 import { searchActivities, Activity } from '@/lib/api';
 import { toast } from 'sonner';
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { runFullEvaluation } from '@/lib/metrics';
 import { runModelComparison } from '@/lib/metricsComparison';
 import { Toggle } from '@/components/ui/toggle';
+import { Badge } from '@/components/ui/badge';
 
 export type ModelType = 'fuzzy' | 'llm' | 'compare';
 
@@ -20,6 +21,19 @@ const Index = () => {
   const [evaluating, setEvaluating] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [activeModel, setActiveModel] = useState<ModelType>('fuzzy');
+  const [embeddingsReady, setEmbeddingsReady] = useState(false);
+
+  // Initialize embeddings model on mount
+  useEffect(() => {
+    initSemanticParser().then((success) => {
+      setEmbeddingsReady(success);
+      if (success) {
+        toast.success("Semantic embeddings loaded!", {
+          description: "Using transformer model for higher accuracy"
+        });
+      }
+    });
+  }, []);
 
   const handleRunComparison = async () => {
     setComparing(true);
@@ -77,7 +91,7 @@ const Index = () => {
       if (activeModel === 'compare') {
         // Run both models in parallel for comparison
         const startFuzzy = performance.now();
-        const fuzzyParsed = parseQuery(query);
+        const fuzzyParsed = embeddingsReady ? await parseQueryAsync(query) : parseQuery(query);
         const fuzzyLatency = performance.now() - startFuzzy;
 
         const startLLM = performance.now();
@@ -142,7 +156,8 @@ const Index = () => {
         if (activeModel === 'llm') {
           parsed = await parseQueryWithLLM(query);
         } else {
-          parsed = parseQuery(query);
+          // Use embeddings-enhanced parser if available
+          parsed = embeddingsReady ? await parseQueryAsync(query) : parseQuery(query);
         }
         
         const latency = performance.now() - startTime;
@@ -227,6 +242,9 @@ const Index = () => {
               >
                 <Cpu className="h-3.5 w-3.5" />
                 Fuzzy
+                {embeddingsReady && activeModel === 'fuzzy' && (
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                )}
               </Toggle>
               <Toggle
                 pressed={activeModel === 'llm'}

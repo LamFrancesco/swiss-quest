@@ -1,7 +1,7 @@
-// NLP using TF-IDF semantic matching for Swiss tourism activities
+// NLP using TF-IDF + Embeddings semantic matching for Swiss tourism activities
 // Re-exports from semantic implementation for improved matching
 
-import { parseQuerySemantic, getMatchScores } from './nlpSemantic';
+import { parseQuerySemantic, parseQuerySemanticAsync, initSemanticParser, getMatchScores } from './nlpSemantic';
 
 export interface ParsedQuery {
   experienceType?: string;
@@ -87,10 +87,18 @@ export function parseQueryKeyword(query: string): ParsedQuery {
   return result;
 }
 
-// Main parseQuery function - now uses TF-IDF semantic matching
+// Main parseQuery function - uses TF-IDF semantic matching (sync)
 export function parseQuery(query: string): ParsedQuery {
   return parseQuerySemantic(query);
 }
+
+// Async version with embeddings support (preferred for higher accuracy)
+export async function parseQueryAsync(query: string): Promise<ParsedQuery> {
+  return parseQuerySemanticAsync(query);
+}
+
+// Initialize embeddings model
+export { initSemanticParser };
 
 // Export for debugging
 export { getMatchScores };
