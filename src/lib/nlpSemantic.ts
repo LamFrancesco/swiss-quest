@@ -60,25 +60,41 @@ function initCorpora() {
 function matchCategory(
   query: string,
   corpus: TFIDFCorpus,
-  threshold: number = 0.08
-): string | undefined {
+  threshold: number = 0.08,
+  categoryName?: string
+): { id: string | undefined; score: number } {
   const queryVec = queryToTFIDF(query, corpus);
   const match = findBestMatch(queryVec, corpus, threshold);
-  return match?.id;
+  
+  if (categoryName && match) {
+    console.log(`[TF-IDF] ${categoryName}: matched "${match.id}" (score: ${match.score.toFixed(3)})`);
+  }
+  
+  return { id: match?.id, score: match?.score || 0 };
 }
 
 export function parseQuerySemantic(query: string): ParsedQuery {
   initCorpora();
+  
+  console.log(`\n[TF-IDF Semantic Parser] Processing: "${query}"`);
   
   const result: ParsedQuery = {
     keywords: [],
   };
 
   // Use TF-IDF semantic matching for each category
-  result.experienceType = matchCategory(query, experienceCorpus, 0.08);
-  result.neededTime = matchCategory(query, timeCorpus, 0.1);
-  result.difficulty = matchCategory(query, difficultyCorpus, 0.1);
-  result.suitableFor = matchCategory(query, suitableCorpus, 0.08);
+  const expMatch = matchCategory(query, experienceCorpus, 0.08, 'experienceType');
+  result.experienceType = expMatch.id;
+  const timeMatch = matchCategory(query, timeCorpus, 0.1, 'neededTime');
+  result.neededTime = timeMatch.id;
+  
+  const diffMatch = matchCategory(query, difficultyCorpus, 0.1, 'difficulty');
+  result.difficulty = diffMatch.id;
+  
+  const suitableMatch = matchCategory(query, suitableCorpus, 0.08, 'suitableFor');
+  result.suitableFor = suitableMatch.id;
+  
+  console.log('[TF-IDF] Final parsed result:', result);
 
   // Extract keywords (words longer than 3 chars, excluding common stop words)
   const stopWords = new Set([
