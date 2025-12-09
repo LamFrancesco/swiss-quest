@@ -1,4 +1,4 @@
-// TF-IDF implementation for semantic matching
+// TF-IDF implementation for semantic matching with stemming
 
 export interface TFIDFDocument {
   id: string;
@@ -12,13 +12,40 @@ export interface TFIDFCorpus {
   vocabulary: Set<string>;
 }
 
-// Tokenize and normalize text
+// Simple suffix-stripping stemmer for better semantic matching
+function stem(word: string): string {
+  // Common suffix patterns to strip
+  const suffixes = [
+    'ational', 'tional', 'ization', 'fulness', 'ousness', 'iveness',
+    'ement', 'ment', 'ness', 'ance', 'ence', 'able', 'ible', 'ical',
+    'ation', 'ator', 'ally', 'ity', 'ive', 'ful', 'ous', 'ism', 'ist',
+    'ing', 'ies', 'ied', 'ion', 'ity', 'ant', 'ent', 'ous', 'ive',
+    'ing', 'ed', 'ly', 'er', 'es', 'al', 'ic', 's'
+  ];
+  
+  let result = word.toLowerCase();
+  
+  // Only stem words longer than 4 characters
+  if (result.length <= 4) return result;
+  
+  for (const suffix of suffixes) {
+    if (result.endsWith(suffix) && result.length - suffix.length >= 3) {
+      result = result.slice(0, -suffix.length);
+      break;
+    }
+  }
+  
+  return result;
+}
+
+// Tokenize, normalize, and stem text
 function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
-    .filter(word => word.length > 2);
+    .filter(word => word.length > 2)
+    .map(word => stem(word));
 }
 
 // Calculate term frequency for a document

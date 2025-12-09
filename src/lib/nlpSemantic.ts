@@ -9,13 +9,13 @@ export interface ParsedQuery {
   keywords: string[];
 }
 
-// Extended category definitions with richer semantic descriptions
+// Extended category definitions with richer semantic descriptions (include word variations for stemming)
 const EXPERIENCE_TYPE_DOCS = [
-  { id: 'cultural', text: 'cultural culture museum art history historic heritage architecture landmark monument gallery exhibition tradition festival theater opera concert classical music' },
-  { id: 'outdoor', text: 'outdoor nature hiking mountain alpine skiing biking adventure trail trek climbing rock forest lake river waterfall scenic view panorama wilderness camping' },
-  { id: 'gastronomy', text: 'food dining restaurant culinary wine cheese gastronomy chocolate fondue raclette gourmet cuisine tasting menu cooking kitchen chef delicacy local specialty swiss' },
-  { id: 'shopping', text: 'shopping shop boutique market store mall retail fashion watches jewelry luxury brand souvenir gift craft artisan handmade' },
-  { id: 'wellness', text: 'wellness spa relax thermal bath sauna massage therapy treatment health resort peaceful calm serene rejuvenate unwind stress relief meditation yoga' },
+  { id: 'cultural', text: 'cultural culture museum art history historical historic heritage sightseeing sightsee architecture landmark monument gallery exhibition tradition festival theater opera concert classical music tour touring' },
+  { id: 'outdoor', text: 'outdoor outdoors nature natural hiking hike mountain mountains alpine skiing ski biking bike adventure adventurous trail trek trekking climbing climb rock forest lake river waterfall scenic view panorama wilderness camping camp explore exploration' },
+  { id: 'gastronomy', text: 'food dining dinner dine restaurant culinary wine cheese gastronomy chocolate fondue raclette gourmet cuisine tasting taste menu cooking cook kitchen chef delicacy local specialty swiss eating eat meal meals' },
+  { id: 'shopping', text: 'shopping shop boutique market store mall retail fashion watches jewelry luxury brand souvenir gift craft artisan handmade buy buying purchase' },
+  { id: 'wellness', text: 'wellness spa relax relaxing relaxation getaway retreat thermal bath bathing sauna massage therapy therapeutic treatment health healthy resort peaceful peace calm calming serene serenity rejuvenate rejuvenation unwind unwinding stress relief meditation meditate yoga tranquil tranquility escape escapism' },
 ];
 
 const NEEDED_TIME_DOCS = [
