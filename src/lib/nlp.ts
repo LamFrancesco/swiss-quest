@@ -1,4 +1,8 @@
-// Simple NLP keyword extraction for Swiss tourism activities
+// NLP using TF-IDF semantic matching for Swiss tourism activities
+// Re-exports from semantic implementation for improved matching
+
+import { parseQuerySemantic, getMatchScores } from './nlpSemantic';
+
 export interface ParsedQuery {
   experienceType?: string;
   neededTime?: string;
@@ -7,6 +11,7 @@ export interface ParsedQuery {
   keywords: string[];
 }
 
+// Legacy exact keyword matching (kept for reference/fallback)
 const EXPERIENCE_TYPES = {
   cultural: ['cultural', 'culture', 'museum', 'art', 'history', 'historic', 'heritage'],
   outdoor: ['outdoor', 'nature', 'hiking', 'mountain', 'alpine', 'skiing', 'biking', 'adventure'],
@@ -37,7 +42,8 @@ const SUITABLE_FOR = {
   couples: ['couple', 'couples', 'romantic', 'romance', 'partner', 'date', 'honeymoon'],
 };
 
-export function parseQuery(query: string): ParsedQuery {
+// Legacy exact keyword matching function
+export function parseQueryKeyword(query: string): ParsedQuery {
   const lowerQuery = query.toLowerCase();
   const result: ParsedQuery = {
     keywords: [],
@@ -80,3 +86,11 @@ export function parseQuery(query: string): ParsedQuery {
 
   return result;
 }
+
+// Main parseQuery function - now uses TF-IDF semantic matching
+export function parseQuery(query: string): ParsedQuery {
+  return parseQuerySemantic(query);
+}
+
+// Export for debugging
+export { getMatchScores };
