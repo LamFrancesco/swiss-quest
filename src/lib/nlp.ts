@@ -3,12 +3,21 @@
 
 import { parseQuerySemantic, parseQuerySemanticAsync, initSemanticParser, getMatchScores } from './nlpSemantic';
 
+export interface ConfidenceScores {
+  experienceType?: number;
+  neededTime?: number;
+  difficulty?: number;
+  suitableFor?: number;
+}
+
 export interface ParsedQuery {
   experienceType?: string;
   neededTime?: string;
   difficulty?: string;
   suitableFor?: string;
   keywords: string[];
+  confidence?: ConfidenceScores;
+  avgConfidence?: number;
 }
 
 // Legacy exact keyword matching (kept for reference/fallback)

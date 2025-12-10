@@ -26,8 +26,13 @@ You MUST respond with ONLY a valid JSON object with these optional fields:
   - Map "kids", "children" to "family"
   - Map "romantic", "date" to "couples"
   - Map "solo", "alone" to "individual"
+- confidence: an object with confidence scores (0.0 to 1.0) for each filter you extracted:
+  - experienceType: your confidence in the experienceType extraction
+  - neededTime: your confidence in the neededTime extraction
+  - difficulty: your confidence in the difficulty extraction
+  - suitableFor: your confidence in the suitableFor extraction
 
-IMPORTANT: Output ONLY the JSON object, no markdown, no explanation.`;
+IMPORTANT: Output ONLY the JSON object, no markdown, no explanation. Include confidence scores for each non-null filter.`;
 
 function getFallbackFilters(query: string): {
   experienceType?: string;
@@ -147,12 +152,39 @@ serve(async (req) => {
     const validDifficulty = ["low", "medium", "high"];
     const validSuitableFor = ["family", "groups", "individual", "seniors", "couples"];
 
+    // Build confidence object
+    const confidence: Record<string, number> = {};
+    const scores: number[] = [];
+    
+    if (parsed.confidence) {
+      if (parsed.experienceType && typeof parsed.confidence.experienceType === 'number') {
+        confidence.experienceType = parsed.confidence.experienceType;
+        scores.push(parsed.confidence.experienceType);
+      }
+      if (parsed.neededTime && typeof parsed.confidence.neededTime === 'number') {
+        confidence.neededTime = parsed.confidence.neededTime;
+        scores.push(parsed.confidence.neededTime);
+      }
+      if (parsed.difficulty && typeof parsed.confidence.difficulty === 'number') {
+        confidence.difficulty = parsed.confidence.difficulty;
+        scores.push(parsed.confidence.difficulty);
+      }
+      if (parsed.suitableFor && typeof parsed.confidence.suitableFor === 'number') {
+        confidence.suitableFor = parsed.confidence.suitableFor;
+        scores.push(parsed.confidence.suitableFor);
+      }
+    }
+    
+    const avgConfidence = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
     const result = {
       experienceType: validExperienceTypes.includes(parsed.experienceType) ? parsed.experienceType : undefined,
       neededTime: validNeededTime.includes(parsed.neededTime) ? parsed.neededTime : undefined,
       difficulty: validDifficulty.includes(parsed.difficulty) ? parsed.difficulty : undefined,
       suitableFor: validSuitableFor.includes(parsed.suitableFor) ? parsed.suitableFor : undefined,
-      keywords: query.split(' ').filter((word: string) => word.length > 3)
+      keywords: query.split(' ').filter((word: string) => word.length > 3),
+      confidence: Object.keys(confidence).length > 0 ? confidence : undefined,
+      avgConfidence: avgConfidence > 0 ? avgConfidence : undefined,
     };
 
     console.log(`[parse-query-llm] Final parsed result:`, result);
