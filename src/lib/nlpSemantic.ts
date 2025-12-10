@@ -7,12 +7,21 @@ import {
   getEmbeddingsStatus 
 } from './embeddings';
 
+export interface ConfidenceScores {
+  experienceType?: number;
+  neededTime?: number;
+  difficulty?: number;
+  suitableFor?: number;
+}
+
 export interface ParsedQuery {
   experienceType?: string;
   neededTime?: string;
   difficulty?: string;
   suitableFor?: string;
   keywords: string[];
+  confidence?: ConfidenceScores;
+  avgConfidence?: number;
 }
 
 // Flag to track if we should use embeddings
@@ -111,10 +120,6 @@ export async function parseQuerySemanticAsync(query: string): Promise<ParsedQuer
   const status = getEmbeddingsStatus();
   console.log(`\n[Semantic Parser] Processing: "${query}" (embeddings: ${status})`);
   
-  const result: ParsedQuery = {
-    keywords: [],
-  };
-
   // Use async matching with embeddings
   const [expMatch, timeMatch, diffMatch, suitableMatch] = await Promise.all([
     matchCategory(query, experienceCorpus, 'experienceType', 0.08),
@@ -123,12 +128,41 @@ export async function parseQuerySemanticAsync(query: string): Promise<ParsedQuer
     matchCategory(query, suitableCorpus, 'suitableFor', 0.08),
   ]);
 
-  result.experienceType = expMatch.id;
-  result.neededTime = timeMatch.id;
-  result.difficulty = diffMatch.id;
-  result.suitableFor = suitableMatch.id;
+  // Build confidence scores
+  const confidence: ConfidenceScores = {};
+  const scores: number[] = [];
+  
+  if (expMatch.id) {
+    confidence.experienceType = expMatch.score;
+    scores.push(expMatch.score);
+  }
+  if (timeMatch.id) {
+    confidence.neededTime = timeMatch.score;
+    scores.push(timeMatch.score);
+  }
+  if (diffMatch.id) {
+    confidence.difficulty = diffMatch.score;
+    scores.push(diffMatch.score);
+  }
+  if (suitableMatch.id) {
+    confidence.suitableFor = suitableMatch.score;
+    scores.push(suitableMatch.score);
+  }
+  
+  const avgConfidence = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+  const result: ParsedQuery = {
+    experienceType: expMatch.id,
+    neededTime: timeMatch.id,
+    difficulty: diffMatch.id,
+    suitableFor: suitableMatch.id,
+    keywords: [],
+    confidence,
+    avgConfidence,
+  };
   
   console.log('[Semantic Parser] Final result:', result);
+  console.log(`[Semantic Parser] Confidence: exp=${confidence.experienceType?.toFixed(3)}, time=${confidence.neededTime?.toFixed(3)}, diff=${confidence.difficulty?.toFixed(3)}, suit=${confidence.suitableFor?.toFixed(3)}, avg=${avgConfidence.toFixed(3)}`);
 
   // Extract keywords
   const stopWords = new Set([
@@ -152,25 +186,48 @@ export function parseQuerySemantic(query: string): ParsedQuery {
   initCorpora();
   
   console.log(`\n[TF-IDF Semantic Parser] Processing: "${query}"`);
-  
-  const result: ParsedQuery = {
-    keywords: [],
-  };
 
   // Use TF-IDF matching only
   const expMatch = matchCategoryTFIDF(query, experienceCorpus, 0.08, 'experienceType');
-  result.experienceType = expMatch.id;
-  
   const timeMatch = matchCategoryTFIDF(query, timeCorpus, 0.1, 'neededTime');
-  result.neededTime = timeMatch.id;
-  
   const diffMatch = matchCategoryTFIDF(query, difficultyCorpus, 0.1, 'difficulty');
-  result.difficulty = diffMatch.id;
-  
   const suitableMatch = matchCategoryTFIDF(query, suitableCorpus, 0.08, 'suitableFor');
-  result.suitableFor = suitableMatch.id;
+  
+  // Build confidence scores
+  const confidence: ConfidenceScores = {};
+  const scores: number[] = [];
+  
+  if (expMatch.id) {
+    confidence.experienceType = expMatch.score;
+    scores.push(expMatch.score);
+  }
+  if (timeMatch.id) {
+    confidence.neededTime = timeMatch.score;
+    scores.push(timeMatch.score);
+  }
+  if (diffMatch.id) {
+    confidence.difficulty = diffMatch.score;
+    scores.push(diffMatch.score);
+  }
+  if (suitableMatch.id) {
+    confidence.suitableFor = suitableMatch.score;
+    scores.push(suitableMatch.score);
+  }
+  
+  const avgConfidence = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+
+  const result: ParsedQuery = {
+    experienceType: expMatch.id,
+    neededTime: timeMatch.id,
+    difficulty: diffMatch.id,
+    suitableFor: suitableMatch.id,
+    keywords: [],
+    confidence,
+    avgConfidence,
+  };
   
   console.log('[TF-IDF] Final parsed result:', result);
+  console.log(`[TF-IDF] Confidence: exp=${confidence.experienceType?.toFixed(3)}, time=${confidence.neededTime?.toFixed(3)}, diff=${confidence.difficulty?.toFixed(3)}, suit=${confidence.suitableFor?.toFixed(3)}, avg=${avgConfidence.toFixed(3)}`);
 
   const stopWords = new Set([
     'want', 'looking', 'find', 'need', 'would', 'like', 'please', 'show',
