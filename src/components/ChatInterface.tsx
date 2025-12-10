@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import ChatMessage from './ChatMessage';
 import { Activity } from '@/lib/api';
+import { ConfidenceScores } from '@/lib/nlp';
 
 interface Message {
   id: string;
@@ -16,6 +17,8 @@ interface Message {
     difficulty?: string;
     suitableFor?: string;
   };
+  confidence?: ConfidenceScores;
+  avgConfidence?: number;
   model?: 'fuzzy' | 'llm' | 'compare';
   latency?: number;
   fuzzyResult?: {
@@ -25,6 +28,8 @@ interface Message {
       difficulty?: string;
       suitableFor?: string;
     };
+    confidence?: ConfidenceScores;
+    avgConfidence?: number;
     latency: number;
   };
   llmResult?: {
@@ -34,6 +39,8 @@ interface Message {
       difficulty?: string;
       suitableFor?: string;
     };
+    confidence?: ConfidenceScores;
+    avgConfidence?: number;
     latency: number;
   };
 }
@@ -111,6 +118,8 @@ const ChatInterface = ({ messages, onSendMessage, onActivityClick, loading }: Ch
                 content={message.content}
                 activities={message.activities}
                 filters={message.filters}
+                confidence={message.confidence}
+                avgConfidence={message.avgConfidence}
                 model={message.model}
                 latency={message.latency}
                 fuzzyResult={message.fuzzyResult}

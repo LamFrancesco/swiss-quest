@@ -2,6 +2,8 @@ import { Bot, User, Cpu, Sparkles, GitCompare } from 'lucide-react';
 import { Activity } from '@/lib/api';
 import ActivityCard from './ActivityCard';
 import { Badge } from './ui/badge';
+import { Progress } from './ui/progress';
+import { ConfidenceScores } from '@/lib/nlp';
 
 interface FilterResult {
   filters: {
@@ -10,6 +12,8 @@ interface FilterResult {
     difficulty?: string;
     suitableFor?: string;
   };
+  confidence?: ConfidenceScores;
+  avgConfidence?: number;
   latency: number;
 }
 
@@ -23,6 +27,8 @@ interface ChatMessageProps {
     difficulty?: string;
     suitableFor?: string;
   };
+  confidence?: ConfidenceScores;
+  avgConfidence?: number;
   model?: 'fuzzy' | 'llm' | 'compare';
   latency?: number;
   fuzzyResult?: FilterResult;
@@ -30,7 +36,17 @@ interface ChatMessageProps {
   onActivityClick?: (activity: Activity) => void;
 }
 
-const ChatMessage = ({ type, content, activities, filters, model, latency, fuzzyResult, llmResult, onActivityClick }: ChatMessageProps) => {
+const ChatMessage = ({ type, content, activities, filters, confidence, avgConfidence, model, latency, fuzzyResult, llmResult, onActivityClick }: ChatMessageProps) => {
+  const getConfidenceColor = (score: number) => {
+    if (score >= 0.8) return 'bg-green-500';
+    if (score >= 0.5) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const formatConfidence = (score?: number) => {
+    if (score === undefined) return null;
+    return `${Math.round(score * 100)}%`;
+  };
   const getFilterLabel = (key: string, value: string) => {
     const labels: Record<string, Record<string, string>> = {
       experienceType: {
@@ -113,27 +129,64 @@ const ChatMessage = ({ type, content, activities, filters, model, latency, fuzzy
           
           <p className="text-sm text-foreground mb-3">
             I understood that you're looking for something:
+            {avgConfidence !== undefined && (
+              <span className="ml-2 text-xs text-muted-foreground">
+                (avg confidence: {formatConfidence(avgConfidence)})
+              </span>
+            )}
           </p>
           <div className="flex flex-wrap gap-2">
             {filters.experienceType && (
-              <Badge variant="default" className="text-xs">
-                {getFilterLabel('experienceType', filters.experienceType)}
-              </Badge>
+              <div className="flex flex-col gap-1">
+                <Badge variant="default" className="text-xs">
+                  {getFilterLabel('experienceType', filters.experienceType)}
+                </Badge>
+                {confidence?.experienceType !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <Progress value={confidence.experienceType * 100} className="h-1 w-16" indicatorClassName={getConfidenceColor(confidence.experienceType)} />
+                    <span className="text-[10px] text-muted-foreground">{formatConfidence(confidence.experienceType)}</span>
+                  </div>
+                )}
+              </div>
             )}
             {filters.suitableFor && (
-              <Badge variant="secondary" className="text-xs">
-                for {getFilterLabel('suitableFor', filters.suitableFor)}
-              </Badge>
+              <div className="flex flex-col gap-1">
+                <Badge variant="secondary" className="text-xs">
+                  for {getFilterLabel('suitableFor', filters.suitableFor)}
+                </Badge>
+                {confidence?.suitableFor !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <Progress value={confidence.suitableFor * 100} className="h-1 w-16" indicatorClassName={getConfidenceColor(confidence.suitableFor)} />
+                    <span className="text-[10px] text-muted-foreground">{formatConfidence(confidence.suitableFor)}</span>
+                  </div>
+                )}
+              </div>
             )}
             {filters.neededTime && (
-              <Badge variant="secondary" className="text-xs">
-                {getFilterLabel('neededTime', filters.neededTime)}
-              </Badge>
+              <div className="flex flex-col gap-1">
+                <Badge variant="secondary" className="text-xs">
+                  {getFilterLabel('neededTime', filters.neededTime)}
+                </Badge>
+                {confidence?.neededTime !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <Progress value={confidence.neededTime * 100} className="h-1 w-16" indicatorClassName={getConfidenceColor(confidence.neededTime)} />
+                    <span className="text-[10px] text-muted-foreground">{formatConfidence(confidence.neededTime)}</span>
+                  </div>
+                )}
+              </div>
             )}
             {filters.difficulty && (
-              <Badge variant="outline" className="text-xs">
-                {getFilterLabel('difficulty', filters.difficulty)}
-              </Badge>
+              <div className="flex flex-col gap-1">
+                <Badge variant="outline" className="text-xs">
+                  {getFilterLabel('difficulty', filters.difficulty)}
+                </Badge>
+                {confidence?.difficulty !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <Progress value={confidence.difficulty * 100} className="h-1 w-16" indicatorClassName={getConfidenceColor(confidence.difficulty)} />
+                    <span className="text-[10px] text-muted-foreground">{formatConfidence(confidence.difficulty)}</span>
+                  </div>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -143,30 +196,69 @@ const ChatMessage = ({ type, content, activities, filters, model, latency, fuzzy
 
   if (type === 'comparison' && fuzzyResult && llmResult) {
     const renderFilterBadges = (result: FilterResult) => (
-      <div className="flex flex-wrap gap-1.5">
-        {result.filters.experienceType && (
-          <Badge variant="default" className="text-xs">
-            {getFilterLabel('experienceType', result.filters.experienceType)}
-          </Badge>
-        )}
-        {result.filters.suitableFor && (
-          <Badge variant="secondary" className="text-xs">
-            for {getFilterLabel('suitableFor', result.filters.suitableFor)}
-          </Badge>
-        )}
-        {result.filters.neededTime && (
-          <Badge variant="secondary" className="text-xs">
-            {getFilterLabel('neededTime', result.filters.neededTime)}
-          </Badge>
-        )}
-        {result.filters.difficulty && (
-          <Badge variant="outline" className="text-xs">
-            {getFilterLabel('difficulty', result.filters.difficulty)}
-          </Badge>
-        )}
-        {!result.filters.experienceType && !result.filters.suitableFor && 
-         !result.filters.neededTime && !result.filters.difficulty && (
-          <span className="text-xs text-muted-foreground italic">No filters detected</span>
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-1.5">
+          {result.filters.experienceType && (
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="default" className="text-xs">
+                {getFilterLabel('experienceType', result.filters.experienceType)}
+              </Badge>
+              {result.confidence?.experienceType !== undefined && (
+                <div className="flex items-center gap-1">
+                  <Progress value={result.confidence.experienceType * 100} className="h-1 w-12" indicatorClassName={getConfidenceColor(result.confidence.experienceType)} />
+                  <span className="text-[10px] text-muted-foreground">{formatConfidence(result.confidence.experienceType)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {result.filters.suitableFor && (
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="secondary" className="text-xs">
+                for {getFilterLabel('suitableFor', result.filters.suitableFor)}
+              </Badge>
+              {result.confidence?.suitableFor !== undefined && (
+                <div className="flex items-center gap-1">
+                  <Progress value={result.confidence.suitableFor * 100} className="h-1 w-12" indicatorClassName={getConfidenceColor(result.confidence.suitableFor)} />
+                  <span className="text-[10px] text-muted-foreground">{formatConfidence(result.confidence.suitableFor)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {result.filters.neededTime && (
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="secondary" className="text-xs">
+                {getFilterLabel('neededTime', result.filters.neededTime)}
+              </Badge>
+              {result.confidence?.neededTime !== undefined && (
+                <div className="flex items-center gap-1">
+                  <Progress value={result.confidence.neededTime * 100} className="h-1 w-12" indicatorClassName={getConfidenceColor(result.confidence.neededTime)} />
+                  <span className="text-[10px] text-muted-foreground">{formatConfidence(result.confidence.neededTime)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {result.filters.difficulty && (
+            <div className="flex flex-col gap-0.5">
+              <Badge variant="outline" className="text-xs">
+                {getFilterLabel('difficulty', result.filters.difficulty)}
+              </Badge>
+              {result.confidence?.difficulty !== undefined && (
+                <div className="flex items-center gap-1">
+                  <Progress value={result.confidence.difficulty * 100} className="h-1 w-12" indicatorClassName={getConfidenceColor(result.confidence.difficulty)} />
+                  <span className="text-[10px] text-muted-foreground">{formatConfidence(result.confidence.difficulty)}</span>
+                </div>
+              )}
+            </div>
+          )}
+          {!result.filters.experienceType && !result.filters.suitableFor && 
+           !result.filters.neededTime && !result.filters.difficulty && (
+            <span className="text-xs text-muted-foreground italic">No filters detected</span>
+          )}
+        </div>
+        {result.avgConfidence !== undefined && (
+          <div className="text-[10px] text-muted-foreground">
+            Avg confidence: {formatConfidence(result.avgConfidence)}
+          </div>
         )}
       </div>
     );

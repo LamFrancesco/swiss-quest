@@ -109,6 +109,8 @@ const Index = () => {
               difficulty: fuzzyParsed.difficulty,
               suitableFor: fuzzyParsed.suitableFor,
             },
+            confidence: fuzzyParsed.confidence,
+            avgConfidence: fuzzyParsed.avgConfidence,
             latency: Math.round(fuzzyLatency),
           },
           llmResult: {
@@ -118,6 +120,8 @@ const Index = () => {
               difficulty: llmParsed.difficulty,
               suitableFor: llmParsed.suitableFor,
             },
+            confidence: llmParsed.confidence,
+            avgConfidence: llmParsed.avgConfidence,
             latency: Math.round(llmLatency),
           },
         };
@@ -173,6 +177,8 @@ const Index = () => {
               difficulty: parsed.difficulty,
               suitableFor: parsed.suitableFor,
             },
+            confidence: parsed.confidence,
+            avgConfidence: parsed.avgConfidence,
             model: activeModel,
             latency: Math.round(latency),
           };
