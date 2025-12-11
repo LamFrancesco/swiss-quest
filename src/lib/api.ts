@@ -168,7 +168,18 @@ export async function searchActivities(filters: {
     }
 
     const data = await response.json();
-    console.log('[API] Found', data.data?.length || 0, 'attractions from API');
+    const count = data.data?.length || 0;
+    console.log('[API] Found', count, 'attractions from API');
+    
+    // Log attraction names for visibility
+    if (data.data?.length > 0) {
+      console.log('[API] Attractions found:');
+      data.data.forEach((item: any, i: number) => {
+        const exp = item.classification?.find((c: any) => c.name === 'experiencetype')?.values?.[0]?.name || '-';
+        const diff = item.classification?.find((c: any) => c.name === 'difficulty')?.values?.[0]?.name || '-';
+        console.log(`  ${i + 1}. ${item.name} [${exp}, ${diff}]`);
+      });
+    }
     
     const apiResults = transformApiAttractions(data);
     
