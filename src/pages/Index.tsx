@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mountain, BarChart, GitCompare, Bot, Cpu, Sparkles, Wifi } from 'lucide-react';
+import { Mountain, BarChart, GitCompare, Bot, Cpu, Sparkles, Wifi, Globe } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery, parseQueryAsync, initSemanticParser } from '@/lib/nlp';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { runFullEvaluation } from '@/lib/metrics';
 import { runModelComparison } from '@/lib/metricsComparison';
+import { runLiveAPIEvaluation } from '@/lib/metricsLiveAPI';
 import { Toggle } from '@/components/ui/toggle';
 import { Badge } from '@/components/ui/badge';
 
@@ -21,6 +22,7 @@ const Index = () => {
   const [evaluating, setEvaluating] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
+  const [liveEval, setLiveEval] = useState(false);
   const [activeModel, setActiveModel] = useState<ModelType>('fuzzy');
   const [embeddingsReady, setEmbeddingsReady] = useState(false);
 
@@ -105,6 +107,27 @@ const Index = () => {
       });
     } finally {
       setEvaluating(false);
+    }
+  };
+
+  const handleRunLiveEval = async () => {
+    setLiveEval(true);
+    toast.info("Starting Live API Evaluation...", {
+      description: "Comparing models against real MySwitzerland API"
+    });
+    
+    try {
+      const report = await runLiveAPIEvaluation();
+      toast.success("Live evaluation complete!", {
+        description: `Filter Match: ${(report.summary.filterMatchRate * 100).toFixed(0)}% | Fuzzy: ${report.summary.avgFuzzyResults} results, LLM: ${report.summary.avgLLMResults} results`
+      });
+    } catch (error) {
+      console.error("Live evaluation failed:", error);
+      toast.error("Live evaluation failed", {
+        description: "Check the console for error details"
+      });
+    } finally {
+      setLiveEval(false);
     }
   };
 
@@ -307,7 +330,7 @@ const Index = () => {
             
             <Button 
               onClick={handleTestApi}
-              disabled={testingApi || comparing || evaluating || loading}
+              disabled={testingApi || comparing || evaluating || loading || liveEval}
               variant="outline"
               size="sm"
               className="gap-2"
@@ -317,7 +340,7 @@ const Index = () => {
             </Button>
             <Button 
               onClick={handleRunComparison}
-              disabled={comparing || evaluating || loading}
+              disabled={comparing || evaluating || loading || liveEval}
               variant="default"
               size="sm"
               className="gap-2"
@@ -327,13 +350,23 @@ const Index = () => {
             </Button>
             <Button 
               onClick={handleRunEvaluation}
-              disabled={evaluating || comparing || loading}
+              disabled={evaluating || comparing || loading || liveEval}
               variant="outline"
               size="sm"
               className="gap-2"
             >
               <BarChart className="h-4 w-4" />
               {evaluating ? "Evaluating..." : "Eval Fuzzy"}
+            </Button>
+            <Button 
+              onClick={handleRunLiveEval}
+              disabled={liveEval || comparing || evaluating || loading}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Globe className="h-4 w-4" />
+              {liveEval ? "Running..." : "Live Eval"}
             </Button>
             <div className="text-muted-foreground text-sm hidden md:block">
               Powered by MySwitzerland
