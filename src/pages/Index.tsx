@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Mountain, BarChart, GitCompare, Bot, Cpu, Sparkles } from 'lucide-react';
+import { Mountain, BarChart, GitCompare, Bot, Cpu, Sparkles, Wifi } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery, parseQueryAsync, initSemanticParser } from '@/lib/nlp';
 import { parseQueryWithLLM } from '@/lib/nlpLLM';
-import { searchActivities, Activity } from '@/lib/api';
+import { searchActivities, Activity, testApiConnection } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { runFullEvaluation } from '@/lib/metrics';
@@ -20,6 +20,7 @@ const Index = () => {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [evaluating, setEvaluating] = useState(false);
   const [comparing, setComparing] = useState(false);
+  const [testingApi, setTestingApi] = useState(false);
   const [activeModel, setActiveModel] = useState<ModelType>('fuzzy');
   const [embeddingsReady, setEmbeddingsReady] = useState(false);
 
@@ -34,6 +35,36 @@ const Index = () => {
       }
     });
   }, []);
+
+  const handleTestApi = async () => {
+    setTestingApi(true);
+    toast.info("Testing MySwitzerland API...", {
+      description: "Checking /attractions endpoint"
+    });
+    
+    try {
+      const result = await testApiConnection();
+      
+      if (result.success) {
+        toast.success("API connection works!", {
+          description: `Found ${result.resultCount} attractions. Check console for details.`
+        });
+        console.log('[API Test] Full result:', result);
+      } else {
+        toast.error("API connection failed", {
+          description: result.error || "Unknown error"
+        });
+        console.error('[API Test] Failed:', result);
+      }
+    } catch (error) {
+      console.error("API test error:", error);
+      toast.error("API test failed", {
+        description: "Check the console for error details"
+      });
+    } finally {
+      setTestingApi(false);
+    }
+  };
 
   const handleRunComparison = async () => {
     setComparing(true);
@@ -274,6 +305,16 @@ const Index = () => {
             
             <div className="h-4 w-px bg-border" />
             
+            <Button 
+              onClick={handleTestApi}
+              disabled={testingApi || comparing || evaluating || loading}
+              variant="outline"
+              size="sm"
+              className="gap-2"
+            >
+              <Wifi className="h-4 w-4" />
+              {testingApi ? "Testing..." : "Test API"}
+            </Button>
             <Button 
               onClick={handleRunComparison}
               disabled={comparing || evaluating || loading}
