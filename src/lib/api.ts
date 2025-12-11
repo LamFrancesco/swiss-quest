@@ -1,6 +1,60 @@
 // MySwitzerland API integration
 const API_KEY = 'QggpOj7O0laCbZwVjlG873l78mnRUfwx3UjzRSMb';
-const BASE_URL = 'https://api.myswitzerland.io/v1';
+const BASE_URL = 'https://opendata.myswitzerland.io/v1';
+
+// Test function to verify API connection
+export async function testApiConnection(): Promise<{
+  success: boolean;
+  endpoint: string;
+  status?: number;
+  resultCount?: number;
+  sampleData?: any;
+  error?: string;
+}> {
+  const endpoint = `${BASE_URL}/attractions?lang=en&limit=5`;
+  
+  try {
+    console.log('[API Test] Testing endpoint:', endpoint);
+    
+    const response = await fetch(endpoint, {
+      headers: {
+        'X-API-Key': API_KEY,
+        'Accept': 'application/json',
+      },
+    });
+
+    console.log('[API Test] Response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[API Test] Error response:', errorText);
+      return {
+        success: false,
+        endpoint,
+        status: response.status,
+        error: `HTTP ${response.status}: ${errorText.substring(0, 200)}`,
+      };
+    }
+
+    const data = await response.json();
+    console.log('[API Test] Response data:', data);
+
+    return {
+      success: true,
+      endpoint,
+      status: response.status,
+      resultCount: data.data?.length || 0,
+      sampleData: data.data?.[0] || data,
+    };
+  } catch (error) {
+    console.error('[API Test] Fetch error:', error);
+    return {
+      success: false,
+      endpoint,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
 
 export interface Activity {
   id: string;
