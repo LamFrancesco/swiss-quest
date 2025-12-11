@@ -68,6 +68,52 @@ export interface Activity {
   experienceType?: string;
 }
 
+// Map our filter values to API facet filter values
+const EXPERIENCE_TYPE_MAP: Record<string, string> = {
+  'cultural': 'culture',
+  'culture': 'culture',
+  'outdoor': 'nature',
+  'nature': 'nature',
+  'adventure': 'adventure',
+  'active': 'active',
+  'wellness': 'relax',
+  'relax': 'relax',
+  'education': 'education',
+};
+
+const DIFFICULTY_MAP: Record<string, string> = {
+  'low': 'low',
+  'easy': 'low',
+  'medium': 'medium',
+  'moderate': 'medium',
+  'high': 'high',
+  'difficult': 'high',
+  'challenging': 'high',
+};
+
+const SUITABLE_FOR_MAP: Record<string, string> = {
+  'families': 'family',
+  'family': 'family',
+  'couples': 'couples',
+  'individual': 'individual',
+  'solo': 'individual',
+  'groups': 'group',
+  'group': 'group',
+  'children': 'children',
+  'seniors': 'individual', // API doesn't have seniors, map to individual
+};
+
+const NEEDED_TIME_MAP: Record<string, string> = {
+  'under-1-hour': 'lessthan1hour',
+  'less-than-1-hour': 'lessthan1hour',
+  '1-2-hours': 'between12hours',
+  '2-4-hours': '2to4hourshalfday',
+  'half-day': '2to4hourshalfday',
+  '4-6-hours': '4to6hours',
+  'full-day': 'fullday',
+  'multi-day': 'multiday',
+};
+
 export async function searchActivities(filters: {
   experienceType?: string;
   neededTime?: string;
@@ -77,14 +123,37 @@ export async function searchActivities(filters: {
 }): Promise<Activity[]> {
   try {
     const params = new URLSearchParams();
+    params.append('lang', 'en');
+    params.append('limit', '20');
     
-    if (filters.experienceType) params.append('experiencetype', filters.experienceType);
-    if (filters.neededTime) params.append('neededtime', filters.neededTime);
-    if (filters.difficulty) params.append('difficulty', filters.difficulty);
-    if (filters.suitableFor) params.append('suitablefor', filters.suitableFor);
-    if (filters.query) params.append('q', filters.query);
+    // Build facet filters
+    const facetFilters: string[] = [];
+    
+    if (filters.experienceType) {
+      const mapped = EXPERIENCE_TYPE_MAP[filters.experienceType.toLowerCase()];
+      if (mapped) facetFilters.push(`experiencetype:${mapped}`);
+    }
+    
+    if (filters.difficulty) {
+      const mapped = DIFFICULTY_MAP[filters.difficulty.toLowerCase()];
+      if (mapped) facetFilters.push(`difficulty:${mapped}`);
+    }
+    
+    if (filters.suitableFor) {
+      const mapped = SUITABLE_FOR_MAP[filters.suitableFor.toLowerCase()];
+      if (mapped) facetFilters.push(`suitablefortype:${mapped}`);
+    }
+    
+    if (filters.neededTime) {
+      const mapped = NEEDED_TIME_MAP[filters.neededTime.toLowerCase()];
+      if (mapped) facetFilters.push(`neededtime:${mapped}`);
+    }
+    
+    // Add facet filters to params
+    facetFilters.forEach(filter => params.append('facet.filter', filter));
 
-    const url = `${BASE_URL}/activities?${params.toString()}`;
+    const url = `${BASE_URL}/attractions?${params.toString()}`;
+    console.log('[API] Searching attractions:', url);
     
     const response = await fetch(url, {
       headers: {
@@ -94,37 +163,60 @@ export async function searchActivities(filters: {
     });
 
     if (!response.ok) {
+      console.error('[API] Error response:', response.status);
       throw new Error(`API error: ${response.status}`);
     }
 
     const data = await response.json();
+    console.log('[API] Found', data.data?.length || 0, 'attractions from API');
     
-    // Transform API response to our Activity format
-    return transformActivities(data);
+    const apiResults = transformApiAttractions(data);
+    
+    // If API returned results, use them; otherwise fall back to mock
+    if (apiResults.length > 0) {
+      return apiResults;
+    }
+    
+    console.log('[API] No API results, falling back to mock data');
+    return getMockActivities(filters);
   } catch (error) {
-    console.error('Error fetching activities:', error);
-    // Return mock data for development
+    console.error('[API] Error fetching activities:', error);
     return getMockActivities(filters);
   }
 }
 
-function transformActivities(data: any): Activity[] {
-  // Transform based on actual API response structure
+// Transform real API response to our Activity format
+function transformApiAttractions(data: any): Activity[] {
   if (!data || !Array.isArray(data.data)) {
     return [];
   }
 
-  return data.data.map((item: any) => ({
-    id: item.id || Math.random().toString(36),
-    title: item.title || item.name || 'Swiss Activity',
-    description: item.description || item.teaser || '',
-    imageUrl: item.image?.url || item.images?.[0]?.url,
-    location: item.location?.name || item.city,
-    duration: item.duration || item.neededTime,
-    difficulty: item.difficulty,
-    suitableFor: item.suitableFor || [],
-    experienceType: item.experienceType,
-  }));
+  return data.data.map((item: any) => {
+    // Extract classification values
+    const classifications = item.classification || [];
+    
+    const getClassificationValue = (name: string): string | undefined => {
+      const classification = classifications.find((c: any) => c.name === name);
+      return classification?.values?.[0]?.name;
+    };
+    
+    const getClassificationValues = (name: string): string[] => {
+      const classification = classifications.find((c: any) => c.name === name);
+      return classification?.values?.map((v: any) => v.name) || [];
+    };
+
+    return {
+      id: item.identifier || Math.random().toString(36),
+      title: item.name || 'Swiss Attraction',
+      description: item.abstract || '',
+      imageUrl: item.photo,
+      location: item.geo ? `${item.geo.latitude?.toFixed(2)}°N, ${item.geo.longitude?.toFixed(2)}°E` : undefined,
+      duration: getClassificationValue('neededtime'),
+      difficulty: getClassificationValue('difficulty'),
+      suitableFor: getClassificationValues('suitablefortype'),
+      experienceType: getClassificationValue('experiencetype'),
+    };
+  });
 }
 
 // Mock data for development/fallback
