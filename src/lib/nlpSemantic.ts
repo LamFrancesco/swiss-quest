@@ -128,25 +128,34 @@ export async function parseQuerySemanticAsync(query: string): Promise<ParsedQuer
     matchCategory(query, suitableCorpus, 'suitableFor', 0.08),
   ]);
 
+  // Normalize TF-IDF scores to more intuitive confidence percentages
+  // TF-IDF scores typically range 0.08-0.5, we map this to 0.5-1.0 for display
+  const normalizeScore = (score: number, threshold: number = 0.08): number => {
+    if (score <= threshold) return 0;
+    // Map score from [threshold, 0.6] to [0.5, 1.0]
+    const normalized = 0.5 + ((score - threshold) / (0.6 - threshold)) * 0.5;
+    return Math.min(1.0, Math.max(0, normalized));
+  };
+
   // Build confidence scores
   const confidence: ConfidenceScores = {};
   const scores: number[] = [];
   
   if (expMatch.id) {
-    confidence.experienceType = expMatch.score;
-    scores.push(expMatch.score);
+    confidence.experienceType = normalizeScore(expMatch.score, 0.08);
+    scores.push(confidence.experienceType);
   }
   if (timeMatch.id) {
-    confidence.neededTime = timeMatch.score;
-    scores.push(timeMatch.score);
+    confidence.neededTime = normalizeScore(timeMatch.score, 0.1);
+    scores.push(confidence.neededTime);
   }
   if (diffMatch.id) {
-    confidence.difficulty = diffMatch.score;
-    scores.push(diffMatch.score);
+    confidence.difficulty = normalizeScore(diffMatch.score, 0.1);
+    scores.push(confidence.difficulty);
   }
   if (suitableMatch.id) {
-    confidence.suitableFor = suitableMatch.score;
-    scores.push(suitableMatch.score);
+    confidence.suitableFor = normalizeScore(suitableMatch.score, 0.08);
+    scores.push(confidence.suitableFor);
   }
   
   const avgConfidence = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
@@ -193,25 +202,32 @@ export function parseQuerySemantic(query: string): ParsedQuery {
   const diffMatch = matchCategoryTFIDF(query, difficultyCorpus, 0.1, 'difficulty');
   const suitableMatch = matchCategoryTFIDF(query, suitableCorpus, 0.08, 'suitableFor');
   
+  // Normalize TF-IDF scores to more intuitive confidence percentages
+  const normalizeScore = (score: number, threshold: number = 0.08): number => {
+    if (score <= threshold) return 0;
+    const normalized = 0.5 + ((score - threshold) / (0.6 - threshold)) * 0.5;
+    return Math.min(1.0, Math.max(0, normalized));
+  };
+
   // Build confidence scores
   const confidence: ConfidenceScores = {};
   const scores: number[] = [];
   
   if (expMatch.id) {
-    confidence.experienceType = expMatch.score;
-    scores.push(expMatch.score);
+    confidence.experienceType = normalizeScore(expMatch.score, 0.08);
+    scores.push(confidence.experienceType);
   }
   if (timeMatch.id) {
-    confidence.neededTime = timeMatch.score;
-    scores.push(timeMatch.score);
+    confidence.neededTime = normalizeScore(timeMatch.score, 0.1);
+    scores.push(confidence.neededTime);
   }
   if (diffMatch.id) {
-    confidence.difficulty = diffMatch.score;
-    scores.push(diffMatch.score);
+    confidence.difficulty = normalizeScore(diffMatch.score, 0.1);
+    scores.push(confidence.difficulty);
   }
   if (suitableMatch.id) {
-    confidence.suitableFor = suitableMatch.score;
-    scores.push(suitableMatch.score);
+    confidence.suitableFor = normalizeScore(suitableMatch.score, 0.08);
+    scores.push(confidence.suitableFor);
   }
   
   const avgConfidence = scores.length > 0 ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
