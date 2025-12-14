@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mountain, BarChart, GitCompare, Bot, Cpu, Sparkles, Wifi, Globe } from 'lucide-react';
+import { Mountain, GitCompare, Bot, Cpu, Sparkles, Wifi } from 'lucide-react';
 import ChatInterface, { Message } from '@/components/ChatInterface';
 import ActivityDetail from '@/components/ActivityDetail';
 import { parseQuery, parseQueryAsync, initSemanticParser } from '@/lib/nlp';
@@ -7,11 +7,8 @@ import { parseQueryWithLLM } from '@/lib/nlpLLM';
 import { searchActivities, Activity, testApiConnection } from '@/lib/api';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { runFullEvaluation } from '@/lib/metrics';
 import { runModelComparison } from '@/lib/metricsComparison';
-import { runLiveAPIEvaluation } from '@/lib/metricsLiveAPI';
 import { Toggle } from '@/components/ui/toggle';
-import { Badge } from '@/components/ui/badge';
 
 export type ModelType = 'fuzzy' | 'llm' | 'compare';
 
@@ -19,10 +16,8 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [evaluating, setEvaluating] = useState(false);
   const [comparing, setComparing] = useState(false);
   const [testingApi, setTestingApi] = useState(false);
-  const [liveEval, setLiveEval] = useState(false);
   const [activeModel, setActiveModel] = useState<ModelType>('fuzzy');
   const [embeddingsReady, setEmbeddingsReady] = useState(false);
 
@@ -70,35 +65,14 @@ const Index = () => {
 
   const handleRunComparison = async () => {
     setComparing(true);
-    toast.info("Starting model comparison...", {
-      description: "Comparing Fuzzy Logic vs LLM - check console for results"
+    toast.info("Running Fuzzy vs LLM evaluation...", {
+      description: "Check console for detailed results"
     });
     
     try {
       const report = await runModelComparison();
-      toast.success("Comparison complete!", {
-        description: `Fuzzy: P=${(report.fuzzyAverages.avgPrecision * 100).toFixed(0)}% R=${(report.fuzzyAverages.avgRecall * 100).toFixed(0)}% | LLM: P=${(report.llmAverages.avgPrecision * 100).toFixed(0)}% R=${(report.llmAverages.avgRecall * 100).toFixed(0)}%`
-      });
-    } catch (error) {
-      console.error("Comparison failed:", error);
-      toast.error("Comparison failed", {
-        description: "Check the console for error details"
-      });
-    } finally {
-      setComparing(false);
-    }
-  };
-
-  const handleRunEvaluation = async () => {
-    setEvaluating(true);
-    toast.info("Starting metrics evaluation...", {
-      description: "Check the browser console for detailed results"
-    });
-    
-    try {
-      const report = await runFullEvaluation();
       toast.success("Evaluation complete!", {
-        description: `Avg Precision: ${(report.averages.avgPrecision * 100).toFixed(1)}%, Avg Recall: ${(report.averages.avgRecall * 100).toFixed(1)}%`
+        description: `Fuzzy: P=${(report.fuzzyAverages.avgPrecision * 100).toFixed(0)}% R=${(report.fuzzyAverages.avgRecall * 100).toFixed(0)}% | LLM: P=${(report.llmAverages.avgPrecision * 100).toFixed(0)}% R=${(report.llmAverages.avgRecall * 100).toFixed(0)}%`
       });
     } catch (error) {
       console.error("Evaluation failed:", error);
@@ -106,28 +80,7 @@ const Index = () => {
         description: "Check the console for error details"
       });
     } finally {
-      setEvaluating(false);
-    }
-  };
-
-  const handleRunLiveEval = async () => {
-    setLiveEval(true);
-    toast.info("Starting Live API Evaluation...", {
-      description: "Comparing models against real MySwitzerland API"
-    });
-    
-    try {
-      const report = await runLiveAPIEvaluation();
-      toast.success("Live evaluation complete!", {
-        description: `Filter Match: ${(report.summary.filterMatchRate * 100).toFixed(0)}% | Fuzzy: ${report.summary.avgFuzzyResults} results, LLM: ${report.summary.avgLLMResults} results`
-      });
-    } catch (error) {
-      console.error("Live evaluation failed:", error);
-      toast.error("Live evaluation failed", {
-        description: "Check the console for error details"
-      });
-    } finally {
-      setLiveEval(false);
+      setComparing(false);
     }
   };
 
@@ -330,7 +283,7 @@ const Index = () => {
             
             <Button 
               onClick={handleTestApi}
-              disabled={testingApi || comparing || evaluating || loading || liveEval}
+              disabled={testingApi || comparing || loading}
               variant="outline"
               size="sm"
               className="gap-2"
@@ -340,33 +293,13 @@ const Index = () => {
             </Button>
             <Button 
               onClick={handleRunComparison}
-              disabled={comparing || evaluating || loading || liveEval}
+              disabled={comparing || loading}
               variant="default"
               size="sm"
               className="gap-2"
             >
               <GitCompare className="h-4 w-4" />
-              {comparing ? "Comparing..." : "Compare"}
-            </Button>
-            <Button 
-              onClick={handleRunEvaluation}
-              disabled={evaluating || comparing || loading || liveEval}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <BarChart className="h-4 w-4" />
-              {evaluating ? "Evaluating..." : "Eval Fuzzy"}
-            </Button>
-            <Button 
-              onClick={handleRunLiveEval}
-              disabled={liveEval || comparing || evaluating || loading}
-              variant="outline"
-              size="sm"
-              className="gap-2"
-            >
-              <Globe className="h-4 w-4" />
-              {liveEval ? "Running..." : "Live Eval"}
+              {comparing ? "Running..." : "Fuzzy vs LLM"}
             </Button>
             <div className="text-muted-foreground text-sm hidden md:block">
               Powered by MySwitzerland
