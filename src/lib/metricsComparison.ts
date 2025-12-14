@@ -2,7 +2,6 @@ import { parseQuery, ParsedQuery } from './nlp';
 import { parseQueryWithLLM } from './nlpLLM';
 import { searchActivities, Activity } from './api';
 import { goldStandardDataset, GoldStandardQuery } from '../data/goldStandardDataset';
-import { calculateNameBasedPrecisionRecall } from './textMatching';
 
 export type ModelType = 'fuzzy' | 'llm';
 
@@ -18,7 +17,7 @@ export interface ModelMetricsResult {
   totalRelevant: number;
   filterAccuracy: number;
   parsedFilters: Partial<ParsedQuery>;
-  matchDetails?: Array<{ returned: string; matched?: string; similarity: number }>;
+  matchDetails?: Array<{ returned: string; relevant: boolean; reason: string }>;
 }
 
 export interface ComparisonReport {
@@ -59,15 +58,65 @@ function checkFilterAccuracy(
   return total > 0 ? matches / total : 1;
 }
 
-function calculatePrecisionRecall(
+function calculateRelevanceBasedPrecisionRecall(
   returnedActivities: Activity[],
-  goldStandard: GoldStandardQuery
-): { precision: number; recall: number; relevantReturned: number; matchDetails: Array<{ returned: string; matched?: string; similarity: number }> } {
-  const returnedTitles = returnedActivities.map(a => a.title);
-  const expectedNames = goldStandard.expectedActivityNames;
+  expectedFilters: any,
+  minExpectedResults: number
+): { precision: number; recall: number; relevantReturned: number; matchDetails: Array<{ returned: string; relevant: boolean; reason: string }> } {
+  const matchDetails: Array<{ returned: string; relevant: boolean; reason: string }> = [];
+  let relevantCount = 0;
 
-  // Use name-based matching for real API results
-  return calculateNameBasedPrecisionRecall(returnedTitles, expectedNames, 0.5);
+  for (const activity of returnedActivities) {
+    let isRelevant = true;
+    const reasons: string[] = [];
+
+    // Check experienceType match
+    if (expectedFilters.experienceType) {
+      const activityTypes = Array.isArray(activity.experienceType) ? activity.experienceType : [];
+      const expectedType = expectedFilters.experienceType.toLowerCase();
+      const hasMatch = activityTypes.some((t: string) => 
+        t.toLowerCase().includes(expectedType) || expectedType.includes(t.toLowerCase())
+      );
+      if (!hasMatch && activityTypes.length > 0) {
+        isRelevant = false;
+        reasons.push(`type mismatch: expected ${expectedType}, got ${activityTypes.join(',')}`);
+      }
+    }
+
+    // Check difficulty match
+    if (expectedFilters.difficulty && activity.difficulty) {
+      if (activity.difficulty.toLowerCase() !== expectedFilters.difficulty.toLowerCase()) {
+        isRelevant = false;
+        reasons.push(`difficulty mismatch: expected ${expectedFilters.difficulty}, got ${activity.difficulty}`);
+      }
+    }
+
+    // Check suitableFor match
+    if (expectedFilters.suitableFor && activity.suitableFor) {
+      const activitySuitable = Array.isArray(activity.suitableFor) ? activity.suitableFor : [];
+      const expectedSuitable = expectedFilters.suitableFor.toLowerCase();
+      const hasMatch = activitySuitable.some((s: string) => 
+        s.toLowerCase().includes(expectedSuitable) || expectedSuitable.includes(s.toLowerCase())
+      );
+      if (!hasMatch && activitySuitable.length > 0) {
+        isRelevant = false;
+        reasons.push(`suitableFor mismatch: expected ${expectedSuitable}`);
+      }
+    }
+
+    if (isRelevant) relevantCount++;
+    
+    matchDetails.push({
+      returned: activity.title,
+      relevant: isRelevant,
+      reason: isRelevant ? 'matches filters' : reasons.join('; ')
+    });
+  }
+
+  const precision = returnedActivities.length > 0 ? relevantCount / returnedActivities.length : 0;
+  const recall = minExpectedResults > 0 ? Math.min(1, relevantCount / minExpectedResults) : 1;
+
+  return { precision, recall, relevantReturned: relevantCount, matchDetails };
 }
 
 async function evaluateQueryWithModel(
@@ -96,9 +145,10 @@ async function evaluateQueryWithModel(
   const latency = endTime - startTime;
 
   const filterAccuracy = checkFilterAccuracy(parsedQuery, goldStandard.expectedFilters);
-  const { precision, recall, relevantReturned, matchDetails } = calculatePrecisionRecall(
+  const { precision, recall, relevantReturned, matchDetails } = calculateRelevanceBasedPrecisionRecall(
     activities,
-    goldStandard
+    goldStandard.expectedFilters,
+    goldStandard.minExpectedResults || 3
   );
 
   return {
