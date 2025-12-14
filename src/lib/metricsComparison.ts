@@ -2,6 +2,7 @@ import { parseQuery, ParsedQuery } from './nlp';
 import { parseQueryWithLLM } from './nlpLLM';
 import { searchActivities, Activity } from './api';
 import { goldStandardDataset, GoldStandardQuery } from '../data/goldStandardDataset';
+import { calculateNameBasedPrecisionRecall } from './textMatching';
 
 export type ModelType = 'fuzzy' | 'llm';
 
@@ -17,6 +18,7 @@ export interface ModelMetricsResult {
   totalRelevant: number;
   filterAccuracy: number;
   parsedFilters: Partial<ParsedQuery>;
+  matchDetails?: Array<{ returned: string; matched?: string; similarity: number }>;
 }
 
 export interface ComparisonReport {
@@ -59,20 +61,13 @@ function checkFilterAccuracy(
 
 function calculatePrecisionRecall(
   returnedActivities: Activity[],
-  expectedActivityIds: string[]
-): { precision: number; recall: number; relevantReturned: number } {
-  const returnedIds = returnedActivities.map(a => a.id);
-  const relevantReturned = returnedIds.filter(id => expectedActivityIds.includes(id)).length;
+  goldStandard: GoldStandardQuery
+): { precision: number; recall: number; relevantReturned: number; matchDetails: Array<{ returned: string; matched?: string; similarity: number }> } {
+  const returnedTitles = returnedActivities.map(a => a.title);
+  const expectedNames = goldStandard.expectedActivityNames;
 
-  const precision = returnedActivities.length > 0 
-    ? relevantReturned / returnedActivities.length 
-    : 0;
-  
-  const recall = expectedActivityIds.length > 0 
-    ? relevantReturned / expectedActivityIds.length 
-    : 0;
-
-  return { precision, recall, relevantReturned };
+  // Use name-based matching for real API results
+  return calculateNameBasedPrecisionRecall(returnedTitles, expectedNames, 0.5);
 }
 
 async function evaluateQueryWithModel(
@@ -101,9 +96,9 @@ async function evaluateQueryWithModel(
   const latency = endTime - startTime;
 
   const filterAccuracy = checkFilterAccuracy(parsedQuery, goldStandard.expectedFilters);
-  const { precision, recall, relevantReturned } = calculatePrecisionRecall(
+  const { precision, recall, relevantReturned, matchDetails } = calculatePrecisionRecall(
     activities,
-    goldStandard.expectedActivityIds
+    goldStandard
   );
 
   return {
@@ -115,14 +110,15 @@ async function evaluateQueryWithModel(
     recall,
     relevantReturned,
     totalReturned: activities.length,
-    totalRelevant: goldStandard.expectedActivityIds.length,
+    totalRelevant: goldStandard.expectedActivityNames.length,
     filterAccuracy,
     parsedFilters: {
       experienceType: parsedQuery.experienceType,
       neededTime: parsedQuery.neededTime,
       difficulty: parsedQuery.difficulty,
       suitableFor: parsedQuery.suitableFor
-    }
+    },
+    matchDetails
   };
 }
 

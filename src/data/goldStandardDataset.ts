@@ -9,7 +9,8 @@ export interface GoldStandardQuery {
     difficulty?: string;
     suitableFor?: string;
   };
-  expectedActivityIds: string[]; // IDs of activities that should be in results
+  expectedActivityIds: string[]; // IDs of activities that should be in results (for mock data)
+  expectedActivityNames: string[]; // Names for fuzzy matching against real API results
   minExpectedResults: number; // Minimum number of results expected
   explanation: string; // Why these results are ideal
   metadata: {
@@ -30,6 +31,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       neededTime: "between1_2hours"
     },
     expectedActivityIds: ["chaplin-world", "olympic-museum", "swiss-national-museum", "bern-old-town", "basel-art-museum"],
+    expectedActivityNames: ["Chaplin's World", "Olympic Museum", "Swiss National Museum", "Bern Old Town", "Kunstmuseum Basel", "Museum", "Culture", "Art"],
     minExpectedResults: 2,
     explanation: "These museums offer cultural experiences that can be completed within 1-2 hours.",
     metadata: {
@@ -47,6 +49,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       suitableFor: "family"
     },
     expectedActivityIds: ["rhine-falls", "mount-rigi", "lake-geneva-cruise", "aletsch-glacier", "pilatus-cable-car", "zurich-lake-promenade"],
+    expectedActivityNames: ["Rhine Falls", "Mount Rigi", "Lake Geneva", "Aletsch Glacier", "Pilatus", "Zürich Lake", "Nature", "Family", "Outdoor"],
     minExpectedResults: 2,
     explanation: "Family-friendly outdoor destinations with accessible facilities.",
     metadata: {
@@ -64,6 +67,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       difficulty: "low"
     },
     expectedActivityIds: ["mount-rigi", "rhine-falls", "lake-geneva-cruise", "pilatus-cable-car", "aletsch-glacier", "zurich-lake-promenade", "glacier-express"],
+    expectedActivityNames: ["Mount Rigi", "Rhine Falls", "Lake Geneva", "Pilatus", "Aletsch Glacier", "Zürich Lake", "Glacier Express", "Hiking", "Trail", "Walk"],
     minExpectedResults: 1,
     explanation: "Low difficulty outdoor activities suitable for beginners.",
     metadata: {
@@ -82,6 +86,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       neededTime: "lessthan1hour"
     },
     expectedActivityIds: ["chapel-bridge"],
+    expectedActivityNames: ["Chapel Bridge", "Lucerne", "Old Town", "Bridge", "Culture"],
     minExpectedResults: 1,
     explanation: "Quick romantic cultural experiences perfect for couples.",
     metadata: {
@@ -99,6 +104,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       neededTime: "between4_8hours"
     },
     expectedActivityIds: ["jungfraujoch"],
+    expectedActivityNames: ["Jungfraujoch", "Top of Europe", "Alps", "Mountain", "Full Day", "Glacier"],
     minExpectedResults: 1,
     explanation: "Full-day outdoor adventures in the Swiss Alps.",
     metadata: {
@@ -117,6 +123,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       neededTime: "lessthan1hour"
     },
     expectedActivityIds: ["chapel-bridge"],
+    expectedActivityNames: ["Chapel Bridge", "Museum", "Culture", "Family"],
     minExpectedResults: 0,
     explanation: "Tests handling of queries with limited matching results. Chapel Bridge is cultural, family-friendly, and quick.",
     metadata: {
@@ -135,6 +142,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       suitableFor: "family"
     },
     expectedActivityIds: ["chaplin-world", "olympic-museum", "jungfraujoch", "rhine-falls", "mount-rigi", "chapel-bridge", "swiss-national-museum", "gruyeres-cheese", "swiss-transport-museum", "matterhorn-glacier-paradise", "pilatus-cable-car", "ballenberg-open-air", "aletsch-glacier", "chocolate-train", "zurich-lake-promenade"],
+    expectedActivityNames: ["Chaplin", "Olympic", "Jungfraujoch", "Rhine Falls", "Rigi", "Chapel Bridge", "Museum", "Gruyères", "Transport", "Matterhorn", "Pilatus", "Ballenberg", "Aletsch", "Chocolate", "Zürich", "Family"],
     minExpectedResults: 5,
     explanation: "All family-suitable activities should match this broad query.",
     metadata: {
@@ -152,6 +160,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       suitableFor: "seniors"
     },
     expectedActivityIds: ["mount-rigi", "glacier-express", "bern-old-town", "lake-geneva-cruise", "lavaux-vineyards", "pilatus-cable-car", "ballenberg-open-air", "aletsch-glacier", "chocolate-train", "zurich-lake-promenade", "basel-art-museum"],
+    expectedActivityNames: ["Rigi", "Glacier Express", "Bern", "Lake Geneva", "Lavaux", "Pilatus", "Ballenberg", "Aletsch", "Chocolate", "Zürich", "Basel", "Easy", "Accessible"],
     minExpectedResults: 3,
     explanation: "Low difficulty activities suitable for senior travelers.",
     metadata: {
@@ -168,6 +177,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       suitableFor: "couples"
     },
     expectedActivityIds: ["chaplin-world", "chapel-bridge", "glacier-express", "bern-old-town", "lake-geneva-cruise", "matterhorn-glacier-paradise", "lavaux-vineyards", "pilatus-cable-car", "aletsch-glacier", "chocolate-train", "zurich-lake-promenade", "basel-art-museum"],
+    expectedActivityNames: ["Chaplin", "Chapel Bridge", "Glacier Express", "Bern", "Lake Geneva", "Matterhorn", "Lavaux", "Pilatus", "Aletsch", "Chocolate", "Zürich", "Basel", "Romantic", "Couples"],
     minExpectedResults: 5,
     explanation: "Activities suitable for couples seeking romantic experiences.",
     metadata: {
@@ -184,6 +194,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       experienceType: "outdoor"
     },
     expectedActivityIds: ["jungfraujoch", "rhine-falls", "mount-rigi", "glacier-express", "lake-geneva-cruise", "matterhorn-glacier-paradise", "pilatus-cable-car", "aletsch-glacier", "zurich-lake-promenade"],
+    expectedActivityNames: ["Jungfraujoch", "Rhine Falls", "Rigi", "Glacier Express", "Lake Geneva", "Matterhorn", "Pilatus", "Aletsch", "Zürich", "Nature", "Outdoor", "Mountain", "Lake"],
     minExpectedResults: 3,
     explanation: "All outdoor activities should be returned.",
     metadata: {
@@ -202,6 +213,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       experienceType: "cultural"
     },
     expectedActivityIds: ["chaplin-world", "olympic-museum", "chapel-bridge", "swiss-national-museum", "bern-old-town", "swiss-transport-museum", "ballenberg-open-air", "basel-art-museum"],
+    expectedActivityNames: ["Chaplin", "Olympic", "Chapel Bridge", "Swiss National Museum", "Bern", "Transport Museum", "Ballenberg", "Basel", "Museum", "Culture", "Art", "History"],
     minExpectedResults: 3,
     explanation: "All cultural activities should match.",
     metadata: {
@@ -218,6 +230,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       experienceType: "outdoor"
     },
     expectedActivityIds: ["jungfraujoch", "rhine-falls", "mount-rigi", "glacier-express", "lake-geneva-cruise", "matterhorn-glacier-paradise", "pilatus-cable-car", "aletsch-glacier", "zurich-lake-promenade"],
+    expectedActivityNames: ["Jungfraujoch", "Rhine Falls", "Rigi", "Glacier Express", "Lake Geneva", "Matterhorn", "Pilatus", "Aletsch", "Zürich", "Nature", "Outdoor", "Mountain"],
     minExpectedResults: 2,
     explanation: "Broad exploratory query about outdoor options.",
     metadata: {
@@ -235,6 +248,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       suitableFor: "seniors"
     },
     expectedActivityIds: ["mount-rigi", "glacier-express", "bern-old-town", "lake-geneva-cruise", "lavaux-vineyards", "pilatus-cable-car", "ballenberg-open-air", "aletsch-glacier", "chocolate-train", "zurich-lake-promenade", "basel-art-museum"],
+    expectedActivityNames: ["Rigi", "Glacier Express", "Bern", "Lake Geneva", "Lavaux", "Pilatus", "Ballenberg", "Aletsch", "Chocolate", "Zürich", "Basel", "Easy", "Accessible", "Relaxing"],
     minExpectedResults: 3,
     explanation: "Context-rich query requiring inference about accessibility needs for elderly/senior travelers.",
     metadata: {
@@ -253,6 +267,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
       experienceType: "gastronomy"
     },
     expectedActivityIds: ["gruyeres-cheese", "lavaux-vineyards", "chocolate-train"],
+    expectedActivityNames: ["Gruyères", "Cheese", "Lavaux", "Vineyard", "Wine", "Chocolate", "Food", "Culinary", "Gastronomy"],
     minExpectedResults: 1,
     explanation: "Tests gastronomy category filtering.",
     metadata: {
@@ -267,6 +282,7 @@ export const goldStandardDataset: GoldStandardQuery[] = [
     intent: "invalid input",
     expectedFilters: {},
     expectedActivityIds: [],
+    expectedActivityNames: [],
     minExpectedResults: 0,
     explanation: "Random input testing error handling - should return no specific filters.",
     metadata: {
