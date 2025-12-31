@@ -1,7 +1,7 @@
 import { parseQuery } from './nlp';
 import { searchActivities, Activity } from './api';
 import { goldStandardDataset, GoldStandardQuery } from '../data/goldStandardDataset';
-import { calculateNameBasedPrecisionRecall } from './textMatching';
+import { calculateFuzzyPrecisionRecall } from './textMatching';
 
 export interface MetricsResult {
   queryId: string;
@@ -9,11 +9,11 @@ export interface MetricsResult {
   latency: number;
   precision: number;
   recall: number;
-  relevantReturned: number;
+  f1Score: number;
   totalReturned: number;
   totalRelevant: number;
   filterAccuracy: number;
-  matchDetails?: Array<{ returned: string; matched?: string; similarity: number }>;
+  matchDetails?: Array<{ returned: string; bestMatch?: string; similarity: number }>;
 }
 
 export interface ConsistencyResult {
@@ -116,13 +116,13 @@ function checkFilterAccuracy(
   return total > 0 ? matches / total : 1;
 }
 
-// Calculate precision and recall using name-based matching
+// Calculate fuzzy precision and recall
 function calculatePrecisionRecall(
   returnedActivities: Activity[],
   expectedActivityNames: string[]
-): { precision: number; recall: number; relevantReturned: number; matchDetails: Array<{ returned: string; matched?: string; similarity: number }> } {
+): { precision: number; recall: number; f1Score: number; matchDetails: Array<{ returned: string; bestMatch?: string; similarity: number }> } {
   const returnedTitles = returnedActivities.map(a => a.title);
-  return calculateNameBasedPrecisionRecall(returnedTitles, expectedActivityNames, 0.5);
+  return calculateFuzzyPrecisionRecall(returnedTitles, expectedActivityNames);
 }
 
 // Evaluate a single query
@@ -147,9 +147,9 @@ async function evaluateQuery(goldStandard: GoldStandardQuery): Promise<MetricsRe
   // Calculate filter accuracy
   const filterAccuracy = checkFilterAccuracy(parsedQuery, goldStandard.expectedFilters);
 
-  // Calculate precision and recall using name-based matching
+  // Calculate fuzzy precision and recall
   const expectedNames = goldStandard.expectedActivityNames || [];
-  const { precision, recall, relevantReturned, matchDetails } = calculatePrecisionRecall(
+  const { precision, recall, f1Score, matchDetails } = calculatePrecisionRecall(
     activities,
     expectedNames
   );
@@ -160,7 +160,7 @@ async function evaluateQuery(goldStandard: GoldStandardQuery): Promise<MetricsRe
     latency,
     precision,
     recall,
-    relevantReturned,
+    f1Score,
     totalReturned: activities.length,
     totalRelevant: expectedNames.length,
     filterAccuracy,
@@ -259,13 +259,14 @@ export async function runFullEvaluation(): Promise<EvaluationReport> {
   console.log('='.repeat(80));
   console.log(`Timestamp: ${report.timestamp}\n`);
 
-  console.log('📊 METRICS RESULTS:');
+  console.log('📊 FUZZY METRICS RESULTS:');
   console.log('-'.repeat(80));
   metricsResults.forEach(result => {
     console.log(`\nQuery [${result.queryId}]: "${result.query}"`);
     console.log(`  ⏱️  Latency: ${result.latency.toFixed(2)}ms`);
-    console.log(`  🎯 Precision: ${(result.precision * 100).toFixed(1)}% (${result.relevantReturned}/${result.totalReturned} relevant)`);
-    console.log(`  📍 Recall: ${(result.recall * 100).toFixed(1)}% (${result.relevantReturned}/${result.totalRelevant} found)`);
+    console.log(`  🎯 Fuzzy Precision: ${(result.precision * 100).toFixed(1)}%`);
+    console.log(`  📍 Fuzzy Recall: ${(result.recall * 100).toFixed(1)}%`);
+    console.log(`  📊 F1 Score: ${(result.f1Score * 100).toFixed(1)}%`);
     console.log(`  🔍 Filter Accuracy: ${(result.filterAccuracy * 100).toFixed(1)}%`);
   });
 
