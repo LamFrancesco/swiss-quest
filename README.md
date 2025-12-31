@@ -1,73 +1,219 @@
-# Welcome to your Lovable project
+# SwissQuest 🏔️
 
-## Project info
+An AI-powered Swiss tourism activity search chatbot that uses dual NLP parsing approaches (TF-IDF + Embeddings vs LLM) to extract search filters from natural language queries.
 
-**URL**: https://lovable.dev/projects/0c0d404f-c5d2-4f55-8e6b-653a49bd8719
+## 🛠️ Technologies
 
-## How can I edit this code?
+| Category | Technology |
+|----------|------------|
+| Frontend | React 18, TypeScript, Vite |
+| Styling | Tailwind CSS, shadcn/ui |
+| NLP (Client) | TF-IDF, Hugging Face Transformers (mxbai-embed-xsmall-v1) |
+| NLP (Server) | Gemini 2.5 Flash via Lovable AI Gateway |
+| API | MySwitzerland Tourism API |
+| Backend | Supabase Edge Functions (Deno) |
 
-There are several ways of editing your application.
+## 📁 Project Structure
 
-**Use Lovable**
+```
+src/
+├── components/                 # React UI components
+│   ├── ChatInterface.tsx       # Main chat UI with message handling
+│   ├── ChatMessage.tsx         # Individual message rendering
+│   ├── ActivityCard.tsx        # Activity result card display
+│   ├── ActivityDetail.tsx      # Detailed activity modal
+│   ├── Hero.tsx                # Hero banner component
+│   └── ui/                     # shadcn/ui components (Button, Card, etc.)
+│
+├── lib/                        # Core business logic
+│   ├── nlp.ts                  # Entry point - routes to Fuzzy or LLM parser
+│   ├── nlpLLM.ts               # LLM parser client (calls Edge Function)
+│   ├── nlpSemantic.ts          # TF-IDF + Embeddings logic
+│   ├── tfidf.ts                # TF-IDF algorithm implementation
+│   ├── embeddings.ts           # HuggingFace transformer model loader
+│   ├── textMatching.ts         # Levenshtein distance & fuzzy metrics
+│   ├── metrics.ts              # Single query evaluation
+│   ├── metricsComparison.ts    # Fuzzy vs LLM comparison runner
+│   ├── metricsLiveAPI.ts       # Live API evaluation utilities
+│   └── api.ts                  # MySwitzerland API client
+│
+├── data/
+│   └── goldStandardDataset.ts  # 15 test queries with expected results
+│
+├── pages/
+│   ├── Index.tsx               # Main application page
+│   └── NotFound.tsx            # 404 page
+│
+├── hooks/                      # Custom React hooks
+└── integrations/
+    └── supabase/               # Supabase client configuration
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/0c0d404f-c5d2-4f55-8e6b-653a49bd8719) and start prompting.
+supabase/
+└── functions/
+    └── parse-query-llm/        # Edge Function for LLM parsing
+        └── index.ts            # Gemini API call with prompt engineering
+```
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🚀 How to Run Locally
 
-**Use your preferred IDE**
+### Prerequisites
+- Node.js 18+ 
+- npm or bun
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+# Clone the repository
+git clone <repository-url>
+cd swissquest
 
-Follow these steps:
+# Install dependencies
+npm install
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
+# Start development server
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+The app will be available at `http://localhost:5173`
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+### Environment Variables
 
-**Use GitHub Codespaces**
+Create a `.env` file (optional for local development):
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```env
+VITE_SUPABASE_URL=<your-supabase-url>
+VITE_SUPABASE_PUBLISHABLE_KEY=<your-supabase-key>
+```
 
-## What technologies are used for this project?
+> **Note**: The Fuzzy Logic model works fully offline. LLM features require the Supabase Edge Function.
 
-This project is built with:
+## 📦 Deployment
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+### Build for Production
 
-## How can I deploy this project?
+```bash
+npm run build
+```
 
-Simply open [Lovable](https://lovable.dev/projects/0c0d404f-c5d2-4f55-8e6b-653a49bd8719) and click on Share -> Publish.
+This generates a `dist/` folder with static files.
 
-## Can I connect a custom domain to my Lovable project?
+### Deploy to Static Hosting
 
-Yes, you can!
+The built files can be deployed to any static hosting provider:
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+- **Vercel**: `vercel deploy`
+- **Netlify**: Drag & drop `dist/` folder
+- **GitHub Pages**: Use `gh-pages` package
+- **Any web server**: Serve the `dist/` folder
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+### Backend Requirements
+
+For LLM features to work in production, you need:
+1. A Supabase project with Edge Functions enabled
+2. The `parse-query-llm` function deployed
+3. `LOVABLE_API_KEY` configured as a secret
+
+## 🧠 Algorithm Overview
+
+### Dual NLP Approach
+
+SwissQuest uses two different approaches to parse natural language queries:
+
+#### 1. Fuzzy Logic (TF-IDF + Embeddings)
+
+**Runs client-side in the browser.**
+
+```
+User Query → Tokenize → Stem → TF-IDF Vector → Cosine Similarity → Best Category Match
+                                     ↓
+                        OR: Embedding Model (mxbai-embed-xsmall-v1)
+```
+
+- **Speed**: ~50-200ms
+- **Cost**: Free (runs locally)
+- **Accuracy**: Good for explicit keywords
+- **Deterministic**: Same input → same output
+
+#### 2. LLM (Gemini 2.5 Flash)
+
+**Runs server-side via Edge Function.**
+
+```
+User Query → Edge Function → Gemini API → Structured JSON → Parsed Filters
+```
+
+- **Speed**: ~800-2000ms
+- **Cost**: API usage fees
+- **Accuracy**: Excellent for context and synonyms
+- **Non-deterministic**: May vary slightly
+
+### Fuzzy Metrics Evaluation
+
+Both models are evaluated using **fuzzy metrics** (not binary thresholds):
+
+| Metric | Formula |
+|--------|---------|
+| **Fuzzy Precision** | `Σ(all similarities) / total returned` |
+| **Fuzzy Recall** | `Σ(best match per expected) / total expected` |
+| **F1-Score** | `2 × (P × R) / (P + R)` |
+
+Similarity is calculated using **Levenshtein Distance**:
+
+```
+similarity = 1 - (edit_distance / max_length)
+```
+
+## ☁️ Cloud Dependencies
+
+This project is hosted on **Lovable Cloud**, which provides:
+
+| Service | Purpose |
+|---------|---------|
+| **Supabase Edge Functions** | Serverless backend for LLM parsing |
+| **Lovable AI Gateway** | Access to Gemini 2.5 Flash without API key management |
+| **Auto-configured secrets** | `LOVABLE_API_KEY` is pre-configured |
+
+### Gemini 2.5 Flash
+
+The LLM parser uses **Google Gemini 2.5 Flash** via the Lovable AI Gateway:
+
+- **Endpoint**: `https://ai.gateway.lovable.dev/v1/chat/completions`
+- **Model**: `google/gemini-2.5-flash`
+- **Features**: Fast inference, good accuracy, structured JSON output
+
+### MySwitzerland API
+
+Activity data is fetched from the official MySwitzerland Tourism API:
+
+- **Endpoint**: `https://www.myswitzerland.com/api/search`
+- **Data**: Swiss tourism activities with filters (category, canton, duration, etc.)
+
+## 📊 Model Comparison
+
+Click "Fuzzy vs LLM" in the app to run a comparison against 15 gold standard queries:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    COMPARISON RESULTS                        │
+├─────────────────────────────────────────────────────────────┤
+│ Metric              │ Fuzzy Logic    │ LLM (Gemini)         │
+├─────────────────────────────────────────────────────────────┤
+│ Avg Latency         │ ~100ms         │ ~1200ms              │
+│ Avg Precision       │ 0.45           │ 0.52                 │
+│ Avg Recall          │ 0.38           │ 0.48                 │
+│ Avg F1-Score        │ 0.41           │ 0.50                 │
+│ Filter Accuracy     │ 0.72           │ 0.85                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) for details.
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/my-feature`
+3. Commit changes: `git commit -m 'Add my feature'`
+4. Push to branch: `git push origin feature/my-feature`
+5. Open a Pull Request
