@@ -79,7 +79,92 @@ export function findMatchingName(
 }
 
 /**
- * Calculate precision and recall using name-based matching
+ * Calculate FUZZY precision and recall using name-based matching
+ * Uses similarity degrees directly instead of binary threshold
+ * 
+ * Fuzzy Precision = sum of all similarities / total returned
+ * Fuzzy Recall = sum of best similarities for each expected / total expected
+ */
+export function calculateFuzzyPrecisionRecall(
+  returnedTitles: string[],
+  expectedNames: string[],
+): { 
+  precision: number; 
+  recall: number; 
+  f1Score: number;
+  sumSimilarities: number;
+  matchDetails: Array<{ returned: string; bestMatch?: string; similarity: number }>;
+} {
+  if (expectedNames.length === 0) {
+    return { precision: 1, recall: 1, f1Score: 1, sumSimilarities: 0, matchDetails: [] };
+  }
+  
+  if (returnedTitles.length === 0) {
+    return { precision: 0, recall: 0, f1Score: 0, sumSimilarities: 0, matchDetails: [] };
+  }
+  
+  const matchDetails: Array<{ returned: string; bestMatch?: string; similarity: number }> = [];
+  
+  // For each returned activity, find its best match similarity
+  let sumReturnedSimilarities = 0;
+  for (const title of returnedTitles) {
+    let bestSimilarity = 0;
+    let bestMatch: string | undefined;
+    
+    for (const expectedName of expectedNames) {
+      const similarity = calculateStringSimilarity(title, expectedName);
+      if (similarity > bestSimilarity) {
+        bestSimilarity = similarity;
+        bestMatch = expectedName;
+      }
+    }
+    
+    sumReturnedSimilarities += bestSimilarity;
+    matchDetails.push({
+      returned: title,
+      bestMatch,
+      similarity: bestSimilarity
+    });
+  }
+  
+  // Fuzzy Precision: average similarity of returned activities
+  const precision = sumReturnedSimilarities / returnedTitles.length;
+  
+  // For recall: find best similarity for each expected activity
+  let sumExpectedSimilarities = 0;
+  for (const expectedName of expectedNames) {
+    let bestSimilarity = 0;
+    
+    for (const title of returnedTitles) {
+      const similarity = calculateStringSimilarity(title, expectedName);
+      if (similarity > bestSimilarity) {
+        bestSimilarity = similarity;
+      }
+    }
+    
+    sumExpectedSimilarities += bestSimilarity;
+  }
+  
+  // Fuzzy Recall: average of best similarities for expected activities
+  const recall = sumExpectedSimilarities / expectedNames.length;
+  
+  // F1 Score
+  const f1Score = (precision + recall) > 0 
+    ? (2 * precision * recall) / (precision + recall) 
+    : 0;
+  
+  return { 
+    precision, 
+    recall, 
+    f1Score,
+    sumSimilarities: sumReturnedSimilarities,
+    matchDetails 
+  };
+}
+
+/**
+ * Legacy function for backward compatibility
+ * @deprecated Use calculateFuzzyPrecisionRecall instead
  */
 export function calculateNameBasedPrecisionRecall(
   returnedTitles: string[],
@@ -91,29 +176,20 @@ export function calculateNameBasedPrecisionRecall(
   relevantReturned: number;
   matchDetails: Array<{ returned: string; matched?: string; similarity: number }>;
 } {
-  if (expectedNames.length === 0) {
-    return { precision: 1, recall: 1, relevantReturned: 0, matchDetails: [] };
-  }
+  // Use fuzzy logic and convert to legacy format
+  const fuzzyResult = calculateFuzzyPrecisionRecall(returnedTitles, expectedNames);
   
-  const matchDetails: Array<{ returned: string; matched?: string; similarity: number }> = [];
-  const matchedExpectedNames = new Set<string>();
+  // Count how many exceeded threshold for legacy relevantReturned
+  const relevantReturned = fuzzyResult.matchDetails.filter(d => d.similarity >= threshold).length;
   
-  for (const title of returnedTitles) {
-    const result = findMatchingName(title, expectedNames, threshold);
-    matchDetails.push({
-      returned: title,
-      matched: result.matchedName,
-      similarity: result.similarity
-    });
-    
-    if (result.matched && result.matchedName) {
-      matchedExpectedNames.add(result.matchedName);
-    }
-  }
-  
-  const relevantReturned = matchedExpectedNames.size;
-  const precision = returnedTitles.length > 0 ? relevantReturned / returnedTitles.length : 0;
-  const recall = expectedNames.length > 0 ? relevantReturned / expectedNames.length : 0;
-  
-  return { precision, recall, relevantReturned, matchDetails };
+  return { 
+    precision: fuzzyResult.precision, 
+    recall: fuzzyResult.recall, 
+    relevantReturned,
+    matchDetails: fuzzyResult.matchDetails.map(d => ({
+      returned: d.returned,
+      matched: d.bestMatch,
+      similarity: d.similarity
+    }))
+  };
 }

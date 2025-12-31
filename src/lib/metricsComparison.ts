@@ -2,6 +2,7 @@ import { parseQuery, ParsedQuery } from './nlp';
 import { parseQueryWithLLM } from './nlpLLM';
 import { searchActivities, Activity } from './api';
 import { goldStandardDataset, GoldStandardQuery } from '../data/goldStandardDataset';
+import { calculateFuzzyPrecisionRecall } from './textMatching';
 
 export type ModelType = 'fuzzy' | 'llm';
 
@@ -12,12 +13,12 @@ export interface ModelMetricsResult {
   latency: number;
   precision: number;
   recall: number;
-  relevantReturned: number;
+  f1Score: number;
   totalReturned: number;
   totalRelevant: number;
   filterAccuracy: number;
   parsedFilters: Partial<ParsedQuery>;
-  matchDetails?: Array<{ returned: string; relevant: boolean; reason: string }>;
+  matchDetails?: Array<{ returned: string; bestMatch?: string; similarity: number }>;
 }
 
 export interface ComparisonReport {
@@ -28,12 +29,14 @@ export interface ComparisonReport {
     avgLatency: number;
     avgPrecision: number;
     avgRecall: number;
+    avgF1Score: number;
     avgFilterAccuracy: number;
   };
   llmAverages: {
     avgLatency: number;
     avgPrecision: number;
     avgRecall: number;
+    avgF1Score: number;
     avgFilterAccuracy: number;
   };
 }
@@ -58,65 +61,13 @@ function checkFilterAccuracy(
   return total > 0 ? matches / total : 1;
 }
 
-function calculateRelevanceBasedPrecisionRecall(
+// Use fuzzy precision/recall based on activity name matching
+function calculateFuzzyMetrics(
   returnedActivities: Activity[],
-  expectedFilters: any,
-  minExpectedResults: number
-): { precision: number; recall: number; relevantReturned: number; matchDetails: Array<{ returned: string; relevant: boolean; reason: string }> } {
-  const matchDetails: Array<{ returned: string; relevant: boolean; reason: string }> = [];
-  let relevantCount = 0;
-
-  for (const activity of returnedActivities) {
-    let isRelevant = true;
-    const reasons: string[] = [];
-
-    // Check experienceType match
-    if (expectedFilters.experienceType) {
-      const activityTypes = Array.isArray(activity.experienceType) ? activity.experienceType : [];
-      const expectedType = expectedFilters.experienceType.toLowerCase();
-      const hasMatch = activityTypes.some((t: string) => 
-        t.toLowerCase().includes(expectedType) || expectedType.includes(t.toLowerCase())
-      );
-      if (!hasMatch && activityTypes.length > 0) {
-        isRelevant = false;
-        reasons.push(`type mismatch: expected ${expectedType}, got ${activityTypes.join(',')}`);
-      }
-    }
-
-    // Check difficulty match
-    if (expectedFilters.difficulty && activity.difficulty) {
-      if (activity.difficulty.toLowerCase() !== expectedFilters.difficulty.toLowerCase()) {
-        isRelevant = false;
-        reasons.push(`difficulty mismatch: expected ${expectedFilters.difficulty}, got ${activity.difficulty}`);
-      }
-    }
-
-    // Check suitableFor match
-    if (expectedFilters.suitableFor && activity.suitableFor) {
-      const activitySuitable = Array.isArray(activity.suitableFor) ? activity.suitableFor : [];
-      const expectedSuitable = expectedFilters.suitableFor.toLowerCase();
-      const hasMatch = activitySuitable.some((s: string) => 
-        s.toLowerCase().includes(expectedSuitable) || expectedSuitable.includes(s.toLowerCase())
-      );
-      if (!hasMatch && activitySuitable.length > 0) {
-        isRelevant = false;
-        reasons.push(`suitableFor mismatch: expected ${expectedSuitable}`);
-      }
-    }
-
-    if (isRelevant) relevantCount++;
-    
-    matchDetails.push({
-      returned: activity.title,
-      relevant: isRelevant,
-      reason: isRelevant ? 'matches filters' : reasons.join('; ')
-    });
-  }
-
-  const precision = returnedActivities.length > 0 ? relevantCount / returnedActivities.length : 0;
-  const recall = minExpectedResults > 0 ? Math.min(1, relevantCount / minExpectedResults) : 1;
-
-  return { precision, recall, relevantReturned: relevantCount, matchDetails };
+  expectedNames: string[]
+): { precision: number; recall: number; f1Score: number; matchDetails: Array<{ returned: string; bestMatch?: string; similarity: number }> } {
+  const returnedTitles = returnedActivities.map(a => a.title);
+  return calculateFuzzyPrecisionRecall(returnedTitles, expectedNames);
 }
 
 async function evaluateQueryWithModel(
@@ -145,10 +96,12 @@ async function evaluateQueryWithModel(
   const latency = endTime - startTime;
 
   const filterAccuracy = checkFilterAccuracy(parsedQuery, goldStandard.expectedFilters);
-  const { precision, recall, relevantReturned, matchDetails } = calculateRelevanceBasedPrecisionRecall(
+  
+  // Use fuzzy metrics based on expected activity names
+  const expectedNames = goldStandard.expectedActivityNames || [];
+  const { precision, recall, f1Score, matchDetails } = calculateFuzzyMetrics(
     activities,
-    goldStandard.expectedFilters,
-    goldStandard.minExpectedResults || 3
+    expectedNames
   );
 
   return {
@@ -158,9 +111,9 @@ async function evaluateQueryWithModel(
     latency,
     precision,
     recall,
-    relevantReturned,
+    f1Score,
     totalReturned: activities.length,
-    totalRelevant: goldStandard.expectedActivityNames.length,
+    totalRelevant: expectedNames.length,
     filterAccuracy,
     parsedFilters: {
       experienceType: parsedQuery.experienceType,
@@ -174,19 +127,20 @@ async function evaluateQueryWithModel(
 
 function calculateAverages(results: ModelMetricsResult[]) {
   if (results.length === 0) {
-    return { avgLatency: 0, avgPrecision: 0, avgRecall: 0, avgFilterAccuracy: 0 };
+    return { avgLatency: 0, avgPrecision: 0, avgRecall: 0, avgF1Score: 0, avgFilterAccuracy: 0 };
   }
   
   return {
     avgLatency: results.reduce((sum, r) => sum + r.latency, 0) / results.length,
     avgPrecision: results.reduce((sum, r) => sum + r.precision, 0) / results.length,
     avgRecall: results.reduce((sum, r) => sum + r.recall, 0) / results.length,
+    avgF1Score: results.reduce((sum, r) => sum + r.f1Score, 0) / results.length,
     avgFilterAccuracy: results.reduce((sum, r) => sum + r.filterAccuracy, 0) / results.length,
   };
 }
 
 export async function runModelComparison(): Promise<ComparisonReport> {
-  console.log('🔍 Starting Model Comparison Evaluation...\n');
+  console.log('🔍 Starting Model Comparison Evaluation (FUZZY LOGIC METRICS)...\n');
   console.log(`📊 Comparing Fuzzy Logic vs LLM on ${goldStandardDataset.length} queries\n`);
 
   const fuzzyResults: ModelMetricsResult[] = [];
@@ -200,14 +154,14 @@ export async function runModelComparison(): Promise<ComparisonReport> {
     console.log('  📐 Testing Fuzzy Logic model...');
     const fuzzyResult = await evaluateQueryWithModel(goldStandard, 'fuzzy');
     fuzzyResults.push(fuzzyResult);
-    console.log(`     ✅ Latency: ${fuzzyResult.latency.toFixed(0)}ms, P: ${(fuzzyResult.precision * 100).toFixed(0)}%, R: ${(fuzzyResult.recall * 100).toFixed(0)}%`);
+    console.log(`     ✅ Latency: ${fuzzyResult.latency.toFixed(0)}ms, P: ${(fuzzyResult.precision * 100).toFixed(1)}%, R: ${(fuzzyResult.recall * 100).toFixed(1)}%, F1: ${(fuzzyResult.f1Score * 100).toFixed(1)}%`);
     
     // LLM model
     console.log('  🤖 Testing LLM model...');
     try {
       const llmResult = await evaluateQueryWithModel(goldStandard, 'llm');
       llmResults.push(llmResult);
-      console.log(`     ✅ Latency: ${llmResult.latency.toFixed(0)}ms, P: ${(llmResult.precision * 100).toFixed(0)}%, R: ${(llmResult.recall * 100).toFixed(0)}%`);
+      console.log(`     ✅ Latency: ${llmResult.latency.toFixed(0)}ms, P: ${(llmResult.precision * 100).toFixed(1)}%, R: ${(llmResult.recall * 100).toFixed(1)}%, F1: ${(llmResult.f1Score * 100).toFixed(1)}%`);
     } catch (error) {
       console.error(`     ❌ LLM evaluation failed:`, error);
       // Add a failed result
@@ -218,9 +172,9 @@ export async function runModelComparison(): Promise<ComparisonReport> {
         latency: 0,
         precision: 0,
         recall: 0,
-        relevantReturned: 0,
+        f1Score: 0,
         totalReturned: 0,
-        totalRelevant: goldStandard.expectedActivityIds.length,
+        totalRelevant: goldStandard.expectedActivityNames.length,
         filterAccuracy: 0,
         parsedFilters: {}
       });
@@ -239,29 +193,32 @@ export async function runModelComparison(): Promise<ComparisonReport> {
   };
 
   // Log comparison summary
-  console.log('\n' + '='.repeat(80));
-  console.log('📈 MODEL COMPARISON REPORT');
+  console.log('\n📈 MODEL COMPARISON REPORT (FUZZY LOGIC METRICS)');
   console.log('='.repeat(80));
   
-  console.log('\n📐 FUZZY LOGIC MODEL:');
+  console.log('\n📐 FUZZY LOGIC NLP MODEL:');
   console.log(`  ⏱️  Avg Latency: ${fuzzyAverages.avgLatency.toFixed(2)}ms`);
-  console.log(`  🎯 Avg Precision: ${(fuzzyAverages.avgPrecision * 100).toFixed(1)}%`);
-  console.log(`  📍 Avg Recall: ${(fuzzyAverages.avgRecall * 100).toFixed(1)}%`);
+  console.log(`  🎯 Avg Fuzzy Precision: ${(fuzzyAverages.avgPrecision * 100).toFixed(1)}%`);
+  console.log(`  📍 Avg Fuzzy Recall: ${(fuzzyAverages.avgRecall * 100).toFixed(1)}%`);
+  console.log(`  📊 Avg F1 Score: ${(fuzzyAverages.avgF1Score * 100).toFixed(1)}%`);
   console.log(`  🔍 Avg Filter Accuracy: ${(fuzzyAverages.avgFilterAccuracy * 100).toFixed(1)}%`);
   
   console.log('\n🤖 LLM MODEL (Gemini 2.5 Flash):');
   console.log(`  ⏱️  Avg Latency: ${llmAverages.avgLatency.toFixed(2)}ms`);
-  console.log(`  🎯 Avg Precision: ${(llmAverages.avgPrecision * 100).toFixed(1)}%`);
-  console.log(`  📍 Avg Recall: ${(llmAverages.avgRecall * 100).toFixed(1)}%`);
+  console.log(`  🎯 Avg Fuzzy Precision: ${(llmAverages.avgPrecision * 100).toFixed(1)}%`);
+  console.log(`  📍 Avg Fuzzy Recall: ${(llmAverages.avgRecall * 100).toFixed(1)}%`);
+  console.log(`  📊 Avg F1 Score: ${(llmAverages.avgF1Score * 100).toFixed(1)}%`);
   console.log(`  🔍 Avg Filter Accuracy: ${(llmAverages.avgFilterAccuracy * 100).toFixed(1)}%`);
   
   console.log('\n📊 COMPARISON:');
   const precisionDiff = llmAverages.avgPrecision - fuzzyAverages.avgPrecision;
   const recallDiff = llmAverages.avgRecall - fuzzyAverages.avgRecall;
+  const f1Diff = llmAverages.avgF1Score - fuzzyAverages.avgF1Score;
   const latencyDiff = llmAverages.avgLatency - fuzzyAverages.avgLatency;
   
   console.log(`  Precision: LLM is ${precisionDiff > 0 ? '+' : ''}${(precisionDiff * 100).toFixed(1)}% vs Fuzzy`);
   console.log(`  Recall: LLM is ${recallDiff > 0 ? '+' : ''}${(recallDiff * 100).toFixed(1)}% vs Fuzzy`);
+  console.log(`  F1 Score: LLM is ${f1Diff > 0 ? '+' : ''}${(f1Diff * 100).toFixed(1)}% vs Fuzzy`);
   console.log(`  Latency: LLM is ${latencyDiff > 0 ? '+' : ''}${latencyDiff.toFixed(0)}ms vs Fuzzy`);
   
   console.log('='.repeat(80) + '\n');
