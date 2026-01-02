@@ -113,24 +113,29 @@ export function calculateFuzzyMetrics(
   returnedTitles: string[],
   expectedNames: string[]
 ): FuzzyMetricsResult {
+  // Handle edge case: no expected names (can't measure relevance)
   if (expectedNames.length === 0) {
+    // If we have no expected names, we can't calculate meaningful metrics
+    // Return undefined/unknown state rather than perfect scores
+    const { name: quantifier, membership } = getBestQuantifier(0);
     return {
-      fuzzyPrecision: 1,
-      fuzzyRecall: 1,
-      fuzzyF1: 1,
-      confusionMatrix: { fuzzyTP: 0, fuzzyFP: 0, fuzzyFN: 0, totalReturned: 0, totalExpected: 0 },
+      fuzzyPrecision: 0,
+      fuzzyRecall: 0,
+      fuzzyF1: 0,
+      confusionMatrix: { fuzzyTP: 0, fuzzyFP: returnedTitles.length, fuzzyFN: 0, totalReturned: returnedTitles.length, totalExpected: 0 },
       truthValueSummary: {
-        quantifier: 'all',
+        quantifier: 'none',
         subject: 'results',
-        summarizer: 'relevant',
-        truthValue: 1,
-        support: 1,
-        fullStatement: 'all of the results are relevant',
+        summarizer: 'measurably relevant',
+        truthValue: 0,
+        support: 0,
+        fullStatement: 'no expected results defined for comparison',
       },
       matchDetails: [],
     };
   }
   
+  // Handle edge case: no results returned
   if (returnedTitles.length === 0) {
     return {
       fuzzyPrecision: 0,
@@ -141,9 +146,9 @@ export function calculateFuzzyMetrics(
         quantifier: 'none',
         subject: 'results',
         summarizer: 'relevant',
-        truthValue: 0,
+        truthValue: 1, // Truth value is high because "none are relevant" is TRUE when there are no results
         support: 0,
-        fullStatement: 'none of the results are relevant',
+        fullStatement: 'none of the results are relevant (no results returned)',
       },
       matchDetails: [],
     };
@@ -207,16 +212,23 @@ export function calculateFuzzyMetrics(
     ? (2 * fuzzyPrecision * fuzzyRecall) / (fuzzyPrecision + fuzzyRecall)
     : 0;
   
-  // Generate TVLS summary
-  const { name: quantifier, membership: truthValue } = getBestQuantifier(fuzzyPrecision);
+  // Generate TVLS summary using the PROPER formula:
+  // The quantifier is selected based on the proportion (fuzzyPrecision = average relevance)
+  // The truth value is how well the quantifier fits the data
+  const { name: quantifier, membership: quantifierFit } = getBestQuantifier(fuzzyPrecision);
+  
+  // Truth value in TVLS: T(Q R are S) = μQ(proportion)
+  // The truth value measures how well the chosen quantifier describes the proportion
+  // For example, if precision is 0.25 and we select "few", truth value is μ_few(0.25)
+  const truthValue = quantifierFit;
   
   const truthValueSummary: LinguisticSummary = {
     quantifier,
     subject: 'results',
     summarizer: 'relevant',
     truthValue,
-    support: fuzzyPrecision,
-    fullStatement: `${quantifier.replace(/_/g, ' ')} of the results are relevant`,
+    support: fuzzyPrecision, // The actual proportion/degree of relevance
+    fullStatement: `${quantifier.replace(/_/g, ' ')} of the results are relevant (support: ${(fuzzyPrecision * 100).toFixed(1)}%)`,
   };
   
   // Calculate confusion matrix
