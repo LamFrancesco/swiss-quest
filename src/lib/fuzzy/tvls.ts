@@ -245,21 +245,40 @@ export function calculateLengthQuality(numSummarizers: number): number {
 
 /**
  * Calculate overall summary quality
+ * 
+ * Fixed: handle edge cases properly to avoid 0 values when data is sparse
  */
 export function calculateSummaryQuality(
   truthValue: number,
   memberships: number[],
   numSummarizers: number = 1
 ): SummaryQuality {
+  // Handle empty or single-element arrays
+  if (memberships.length === 0) {
+    return {
+      truthValue,
+      degreeOfImprecision: 0,
+      degreeOfCovering: 0,
+      degreeOfAppropriateness: 0,
+      lengthQuality: calculateLengthQuality(numSummarizers),
+      overallQuality: 0,
+    };
+  }
+  
   const t2 = calculateDegreeOfImprecision(memberships);
   const t3 = calculateDegreeOfCovering(memberships);
   const t4 = calculateDegreeOfAppropriateness(memberships);
   const t5 = calculateLengthQuality(numSummarizers);
   
-  // Overall quality using geometric mean
-  const overall = Math.pow(
-    truthValue * t2 * t3 * t4 * t5,
-    1/5
+  // Overall quality using weighted average instead of geometric mean
+  // This avoids the problem of any 0 value making the whole product 0
+  // Weights: T1 (truth value) = 0.4, T2-T4 = 0.15 each, T5 = 0.15
+  const overall = (
+    0.4 * truthValue +
+    0.15 * t2 +
+    0.15 * t3 +
+    0.15 * t4 +
+    0.15 * t5
   );
   
   return {
