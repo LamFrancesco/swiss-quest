@@ -221,13 +221,44 @@ export async function runModelComparison(): Promise<ComparisonReport> {
     llmAverages
   };
 
-  // Get TVLS summaries from last results
-  const lastFuzzyTVLS = fuzzyResults[fuzzyResults.length - 1]?.truthValueSummary;
-  const lastLlmTVLS = llmResults[llmResults.length - 1]?.truthValueSummary;
-  const lastFuzzyQuality = fuzzyResults[fuzzyResults.length - 1]?.summaryQuality;
-  const lastLlmQuality = llmResults[llmResults.length - 1]?.summaryQuality;
+  // Calculate AGGREGATE TVLS across all queries (not just the last one)
+  // The proper approach: aggregate all precision values and generate a summary for the overall performance
+  const aggregateFuzzyPrecision = fuzzyAverages.avgPrecision;
+  const aggregateLlmPrecision = llmAverages.avgPrecision;
+  
+  // Import getBestQuantifier for aggregate summary
+  const { getBestQuantifier } = await import('./fuzzy/linguisticQuantifiers');
+  
+  // Generate aggregate TVLS for fuzzy model
+  const fuzzyQuantifierResult = getBestQuantifier(aggregateFuzzyPrecision);
+  const aggregateFuzzyTVLS: LinguisticSummary = {
+    quantifier: fuzzyQuantifierResult.name,
+    subject: 'results across all queries',
+    summarizer: 'relevant',
+    truthValue: fuzzyQuantifierResult.membership,
+    support: aggregateFuzzyPrecision,
+    fullStatement: `${fuzzyQuantifierResult.name.replace(/_/g, ' ')} of the results are relevant (avg precision: ${(aggregateFuzzyPrecision * 100).toFixed(1)}%)`
+  };
+  
+  // Generate aggregate TVLS for LLM model  
+  const llmQuantifierResult = getBestQuantifier(aggregateLlmPrecision);
+  const aggregateLlmTVLS: LinguisticSummary = {
+    quantifier: llmQuantifierResult.name,
+    subject: 'results across all queries',
+    summarizer: 'relevant',
+    truthValue: llmQuantifierResult.membership,
+    support: aggregateLlmPrecision,
+    fullStatement: `${llmQuantifierResult.name.replace(/_/g, ' ')} of the results are relevant (avg precision: ${(aggregateLlmPrecision * 100).toFixed(1)}%)`
+  };
+  
+  // Calculate aggregate quality metrics
+  const allFuzzyMemberships = fuzzyResults.flatMap(r => r.matchDetails?.map(d => d.relevanceMembership) || []);
+  const allLlmMemberships = llmResults.flatMap(r => r.matchDetails?.map(d => d.relevanceMembership) || []);
+  
+  const aggregateFuzzyQuality = calculateSummaryQuality(fuzzyQuantifierResult.membership, allFuzzyMemberships, 1);
+  const aggregateLlmQuality = calculateSummaryQuality(llmQuantifierResult.membership, allLlmMemberships, 1);
 
-  // Log comparison summary with TVLS
+  // Log comparison summary with AGGREGATE TVLS
   console.log('\n📈 MODEL COMPARISON REPORT (TVLS METRICS)');
   console.log('='.repeat(80));
   
@@ -238,21 +269,17 @@ export async function runModelComparison(): Promise<ComparisonReport> {
   console.log(`  📊 Fuzzy F1: ${fuzzyAverages.avgF1Score.toFixed(3)}`);
   console.log(`  🔍 Filter Accuracy: ${fuzzyAverages.avgFilterAccuracy.toFixed(3)}`);
   
-  if (lastFuzzyTVLS) {
-    console.log('\n  📝 LINGUISTIC SUMMARY (TVLS):');
-    console.log(`     "${lastFuzzyTVLS.fullStatement}"`);
-    console.log(`     Truth Value: ${lastFuzzyTVLS.truthValue.toFixed(3)}`);
-    console.log(`     Support: ${lastFuzzyTVLS.support.toFixed(3)}`);
-  }
+  console.log('\n  📝 AGGREGATE LINGUISTIC SUMMARY (TVLS):');
+  console.log(`     "${aggregateFuzzyTVLS.fullStatement}"`);
+  console.log(`     Quantifier: "${aggregateFuzzyTVLS.quantifier.replace(/_/g, ' ')}" → μ(${aggregateFuzzyPrecision.toFixed(3)}) = ${aggregateFuzzyTVLS.truthValue.toFixed(3)}`);
+  console.log(`     Support (avg precision): ${aggregateFuzzyTVLS.support.toFixed(3)}`);
   
-  if (lastFuzzyQuality) {
-    console.log('\n  📊 SUMMARY QUALITY METRICS:');
-    console.log(`     Imprecision (T2): ${lastFuzzyQuality.degreeOfImprecision.toFixed(3)}`);
-    console.log(`     Covering (T3): ${lastFuzzyQuality.degreeOfCovering.toFixed(3)}`);
-    console.log(`     Appropriateness (T4): ${lastFuzzyQuality.degreeOfAppropriateness.toFixed(3)}`);
-    console.log(`     Length Quality (T5): ${lastFuzzyQuality.lengthQuality.toFixed(3)}`);
-    console.log(`     Overall Quality: ${lastFuzzyQuality.overallQuality.toFixed(3)}`);
-  }
+  console.log('\n  📊 AGGREGATE QUALITY METRICS:');
+  console.log(`     Imprecision (T2): ${aggregateFuzzyQuality.degreeOfImprecision.toFixed(3)}`);
+  console.log(`     Covering (T3): ${aggregateFuzzyQuality.degreeOfCovering.toFixed(3)}`);
+  console.log(`     Appropriateness (T4): ${aggregateFuzzyQuality.degreeOfAppropriateness.toFixed(3)}`);
+  console.log(`     Length Quality (T5): ${aggregateFuzzyQuality.lengthQuality.toFixed(3)}`);
+  console.log(`     Overall Quality: ${aggregateFuzzyQuality.overallQuality.toFixed(3)}`);
   
   console.log('\n🤖 LLM MODEL (Gemini 2.5 Flash):');
   console.log(`  ⏱️  Avg Latency: ${llmAverages.avgLatency.toFixed(2)}ms`);
@@ -261,21 +288,23 @@ export async function runModelComparison(): Promise<ComparisonReport> {
   console.log(`  📊 Fuzzy F1: ${llmAverages.avgF1Score.toFixed(3)}`);
   console.log(`  🔍 Filter Accuracy: ${llmAverages.avgFilterAccuracy.toFixed(3)}`);
   
-  if (lastLlmTVLS) {
-    console.log('\n  📝 LINGUISTIC SUMMARY (TVLS):');
-    console.log(`     "${lastLlmTVLS.fullStatement}"`);
-    console.log(`     Truth Value: ${lastLlmTVLS.truthValue.toFixed(3)}`);
-    console.log(`     Support: ${lastLlmTVLS.support.toFixed(3)}`);
-  }
+  console.log('\n  📝 AGGREGATE LINGUISTIC SUMMARY (TVLS):');
+  console.log(`     "${aggregateLlmTVLS.fullStatement}"`);
+  console.log(`     Quantifier: "${aggregateLlmTVLS.quantifier.replace(/_/g, ' ')}" → μ(${aggregateLlmPrecision.toFixed(3)}) = ${aggregateLlmTVLS.truthValue.toFixed(3)}`);
+  console.log(`     Support (avg precision): ${aggregateLlmTVLS.support.toFixed(3)}`);
   
-  if (lastLlmQuality) {
-    console.log('\n  📊 SUMMARY QUALITY METRICS:');
-    console.log(`     Imprecision (T2): ${lastLlmQuality.degreeOfImprecision.toFixed(3)}`);
-    console.log(`     Covering (T3): ${lastLlmQuality.degreeOfCovering.toFixed(3)}`);
-    console.log(`     Appropriateness (T4): ${lastLlmQuality.degreeOfAppropriateness.toFixed(3)}`);
-    console.log(`     Length Quality (T5): ${lastLlmQuality.lengthQuality.toFixed(3)}`);
-    console.log(`     Overall Quality: ${lastLlmQuality.overallQuality.toFixed(3)}`);
-  }
+  console.log('\n  📊 AGGREGATE QUALITY METRICS:');
+  console.log(`     Imprecision (T2): ${aggregateLlmQuality.degreeOfImprecision.toFixed(3)}`);
+  console.log(`     Covering (T3): ${aggregateLlmQuality.degreeOfCovering.toFixed(3)}`);
+  console.log(`     Appropriateness (T4): ${aggregateLlmQuality.degreeOfAppropriateness.toFixed(3)}`);
+  console.log(`     Length Quality (T5): ${aggregateLlmQuality.lengthQuality.toFixed(3)}`);
+  console.log(`     Overall Quality: ${aggregateLlmQuality.overallQuality.toFixed(3)}`);
+  
+  // Add explanation of the Truth Value
+  console.log('\n  ℹ️  TVLS INTERPRETATION:');
+  console.log(`     Truth Value = μ_quantifier(proportion)`);
+  console.log(`     E.g., for precision ${(aggregateFuzzyPrecision * 100).toFixed(1)}%, best quantifier "${aggregateFuzzyTVLS.quantifier.replace(/_/g, ' ')}" has μ=${aggregateFuzzyTVLS.truthValue.toFixed(3)}`);
+  console.log(`     Higher truth value means the quantifier accurately describes the data.`);
   
   console.log('\n📊 COMPARISON:');
   const precisionDiff = llmAverages.avgPrecision - fuzzyAverages.avgPrecision;
@@ -290,9 +319,9 @@ export async function runModelComparison(): Promise<ComparisonReport> {
   
   console.log('='.repeat(80) + '\n');
 
-  // Add TVLS data to the report for UI consumption
-  (report as any).fuzzyTVLS = lastFuzzyTVLS;
-  (report as any).llmTVLS = lastLlmTVLS;
+  // Add TVLS data to the report for UI consumption (using aggregate TVLS)
+  (report as any).fuzzyTVLS = aggregateFuzzyTVLS;
+  (report as any).llmTVLS = aggregateLlmTVLS;
 
   return report;
 }
