@@ -65,27 +65,14 @@ const Index = () => {
 
   const handleRunComparison = async () => {
     setComparing(true);
-    toast.info("Running TVLS evaluation...", {
-      description: "Check console for detailed Fuzzy Logic metrics"
+    toast.info("Running Fuzzy vs LLM evaluation...", {
+      description: "Check console for detailed results"
     });
     
     try {
       const report = await runModelComparison();
-      
-      // Extract TVLS data from report
-      const fuzzyTVLS = (report as any).fuzzyTVLS;
-      const llmTVLS = (report as any).llmTVLS;
-      
-      // Format TVLS summary for toast
-      const fuzzyStatement = fuzzyTVLS 
-        ? `"${fuzzyTVLS.quantifier.replace(/_/g, ' ')}" (T=${fuzzyTVLS.truthValue.toFixed(2)})`
-        : `P=${report.fuzzyAverages.avgPrecision.toFixed(2)}`;
-      const llmStatement = llmTVLS
-        ? `"${llmTVLS.quantifier.replace(/_/g, ' ')}" (T=${llmTVLS.truthValue.toFixed(2)})`
-        : `P=${report.llmAverages.avgPrecision.toFixed(2)}`;
-      
-      toast.success("TVLS Evaluation complete!", {
-        description: `Fuzzy: ${fuzzyStatement} | LLM: ${llmStatement}`
+      toast.success("Evaluation complete!", {
+        description: `Fuzzy: P=${(report.fuzzyAverages.avgPrecision * 100).toFixed(0)}% R=${(report.fuzzyAverages.avgRecall * 100).toFixed(0)}% | LLM: P=${(report.llmAverages.avgPrecision * 100).toFixed(0)}% R=${(report.llmAverages.avgRecall * 100).toFixed(0)}%`
       });
     } catch (error) {
       console.error("Evaluation failed:", error);

@@ -2,8 +2,7 @@ import { parseQuery, ParsedQuery } from './nlp';
 import { parseQueryWithLLM } from './nlpLLM';
 import { searchActivities, Activity } from './api';
 import { goldStandardDataset, GoldStandardQuery } from '../data/goldStandardDataset';
-import { calculateFuzzyMetrics, FuzzyMetricsResult } from './fuzzy/fuzzyMetrics';
-import { calculateSummaryQuality, SummaryQuality, LinguisticSummary } from './fuzzy/tvls';
+import { calculateFuzzyPrecisionRecall } from './textMatching';
 
 export type ModelType = 'fuzzy' | 'llm';
 
@@ -19,10 +18,7 @@ export interface ModelMetricsResult {
   totalRelevant: number;
   filterAccuracy: number;
   parsedFilters: Partial<ParsedQuery>;
-  matchDetails?: Array<{ returned: string; bestMatch?: string; similarity: number; relevanceMembership: number }>;
-  // TVLS additions
-  truthValueSummary?: LinguisticSummary;
-  summaryQuality?: SummaryQuality;
+  matchDetails?: Array<{ returned: string; bestMatch?: string; similarity: number }>;
 }
 
 export interface ComparisonReport {
@@ -65,13 +61,13 @@ function checkFilterAccuracy(
   return total > 0 ? matches / total : 1;
 }
 
-// Use formal fuzzy metrics with TVLS from fuzzy logic framework
-function computeFuzzyMetricsWithTVLS(
+// Use fuzzy precision/recall based on activity name matching
+function calculateFuzzyMetrics(
   returnedActivities: Activity[],
   expectedNames: string[]
-): FuzzyMetricsResult {
+): { precision: number; recall: number; f1Score: number; matchDetails: Array<{ returned: string; bestMatch?: string; similarity: number }> } {
   const returnedTitles = returnedActivities.map(a => a.title);
-  return calculateFuzzyMetrics(returnedTitles, expectedNames);
+  return calculateFuzzyPrecisionRecall(returnedTitles, expectedNames);
 }
 
 async function evaluateQueryWithModel(
@@ -101,16 +97,11 @@ async function evaluateQueryWithModel(
 
   const filterAccuracy = checkFilterAccuracy(parsedQuery, goldStandard.expectedFilters);
   
-  // Use formal fuzzy metrics with TVLS
+  // Use fuzzy metrics based on expected activity names
   const expectedNames = goldStandard.expectedActivityNames || [];
-  const fuzzyResult = computeFuzzyMetricsWithTVLS(activities, expectedNames);
-  
-  // Calculate summary quality metrics
-  const relevanceMemberships = fuzzyResult.matchDetails.map(d => d.relevanceMembership);
-  const summaryQuality = calculateSummaryQuality(
-    fuzzyResult.truthValueSummary.truthValue,
-    relevanceMemberships,
-    1
+  const { precision, recall, f1Score, matchDetails } = calculateFuzzyMetrics(
+    activities,
+    expectedNames
   );
 
   return {
@@ -118,9 +109,9 @@ async function evaluateQueryWithModel(
     query: goldStandard.query,
     model,
     latency,
-    precision: fuzzyResult.fuzzyPrecision,
-    recall: fuzzyResult.fuzzyRecall,
-    f1Score: fuzzyResult.fuzzyF1,
+    precision,
+    recall,
+    f1Score,
     totalReturned: activities.length,
     totalRelevant: expectedNames.length,
     filterAccuracy,
@@ -130,9 +121,7 @@ async function evaluateQueryWithModel(
       difficulty: parsedQuery.difficulty,
       suitableFor: parsedQuery.suitableFor
     },
-    matchDetails: fuzzyResult.matchDetails,
-    truthValueSummary: fuzzyResult.truthValueSummary,
-    summaryQuality,
+    matchDetails
   };
 }
 
@@ -158,57 +147,39 @@ export async function runModelComparison(): Promise<ComparisonReport> {
   const llmResults: ModelMetricsResult[] = [];
 
   // Evaluate both models on all queries
-  // Run queries sequentially to avoid rate limits
-  let successfulLlmCount = 0;
-  let failedLlmCount = 0;
-  
   for (const goldStandard of goldStandardDataset) {
-    // Skip queries with no expected results (edge cases)
-    if (goldStandard.expectedActivityNames.length === 0) {
-      console.log(`\n⏭️ Skipping edge case query: "${goldStandard.query}"`);
-      continue;
-    }
-    
     console.log(`\n⏳ Query: "${goldStandard.query}"`);
     
     // Fuzzy model
     console.log('  📐 Testing Fuzzy Logic model...');
-    try {
-      const fuzzyResult = await evaluateQueryWithModel(goldStandard, 'fuzzy');
-      fuzzyResults.push(fuzzyResult);
-      const summary = fuzzyResult.truthValueSummary;
-      console.log(`     ✅ Latency: ${fuzzyResult.latency.toFixed(0)}ms`);
-      console.log(`     📊 P: ${fuzzyResult.precision.toFixed(3)}, R: ${fuzzyResult.recall.toFixed(3)}, F1: ${fuzzyResult.f1Score.toFixed(3)}`);
-      if (summary) {
-        console.log(`     📝 TVLS: "${summary.quantifier.replace(/_/g, ' ')}" (T=${summary.truthValue.toFixed(2)}, support=${summary.support.toFixed(2)})`);
-      }
-    } catch (error) {
-      console.error(`     ❌ Fuzzy evaluation failed:`, error);
-    }
+    const fuzzyResult = await evaluateQueryWithModel(goldStandard, 'fuzzy');
+    fuzzyResults.push(fuzzyResult);
+    console.log(`     ✅ Latency: ${fuzzyResult.latency.toFixed(0)}ms, P: ${(fuzzyResult.precision * 100).toFixed(1)}%, R: ${(fuzzyResult.recall * 100).toFixed(1)}%, F1: ${(fuzzyResult.f1Score * 100).toFixed(1)}%`);
     
-    // LLM model - add delay to prevent rate limiting
+    // LLM model
     console.log('  🤖 Testing LLM model...');
     try {
-      // Add 2 second delay between LLM calls to avoid rate limits
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
       const llmResult = await evaluateQueryWithModel(goldStandard, 'llm');
       llmResults.push(llmResult);
-      successfulLlmCount++;
-      const summary = llmResult.truthValueSummary;
-      console.log(`     ✅ Latency: ${llmResult.latency.toFixed(0)}ms`);
-      console.log(`     📊 P: ${llmResult.precision.toFixed(3)}, R: ${llmResult.recall.toFixed(3)}, F1: ${llmResult.f1Score.toFixed(3)}`);
-      if (summary) {
-        console.log(`     📝 TVLS: "${summary.quantifier.replace(/_/g, ' ')}" (T=${summary.truthValue.toFixed(2)}, support=${summary.support.toFixed(2)})`);
-      }
+      console.log(`     ✅ Latency: ${llmResult.latency.toFixed(0)}ms, P: ${(llmResult.precision * 100).toFixed(1)}%, R: ${(llmResult.recall * 100).toFixed(1)}%, F1: ${(llmResult.f1Score * 100).toFixed(1)}%`);
     } catch (error) {
-      failedLlmCount++;
       console.error(`     ❌ LLM evaluation failed:`, error);
-      // Don't add failed results - they skew the averages
+      // Add a failed result
+      llmResults.push({
+        queryId: goldStandard.id,
+        query: goldStandard.query,
+        model: 'llm',
+        latency: 0,
+        precision: 0,
+        recall: 0,
+        f1Score: 0,
+        totalReturned: 0,
+        totalRelevant: goldStandard.expectedActivityNames.length,
+        filterAccuracy: 0,
+        parsedFilters: {}
+      });
     }
   }
-  
-  console.log(`\n📈 LLM Summary: ${successfulLlmCount} successful, ${failedLlmCount} failed`);
 
   const fuzzyAverages = calculateAverages(fuzzyResults);
   const llmAverages = calculateAverages(llmResults);
@@ -221,90 +192,23 @@ export async function runModelComparison(): Promise<ComparisonReport> {
     llmAverages
   };
 
-  // Calculate AGGREGATE TVLS across all queries (not just the last one)
-  // The proper approach: aggregate all precision values and generate a summary for the overall performance
-  const aggregateFuzzyPrecision = fuzzyAverages.avgPrecision;
-  const aggregateLlmPrecision = llmAverages.avgPrecision;
-  
-  // Import getBestQuantifier for aggregate summary
-  const { getBestQuantifier } = await import('./fuzzy/linguisticQuantifiers');
-  
-  // Generate aggregate TVLS for fuzzy model
-  const fuzzyQuantifierResult = getBestQuantifier(aggregateFuzzyPrecision);
-  const aggregateFuzzyTVLS: LinguisticSummary = {
-    quantifier: fuzzyQuantifierResult.name,
-    subject: 'results across all queries',
-    summarizer: 'relevant',
-    truthValue: fuzzyQuantifierResult.membership,
-    support: aggregateFuzzyPrecision,
-    fullStatement: `${fuzzyQuantifierResult.name.replace(/_/g, ' ')} of the results are relevant (avg precision: ${(aggregateFuzzyPrecision * 100).toFixed(1)}%)`
-  };
-  
-  // Generate aggregate TVLS for LLM model  
-  const llmQuantifierResult = getBestQuantifier(aggregateLlmPrecision);
-  const aggregateLlmTVLS: LinguisticSummary = {
-    quantifier: llmQuantifierResult.name,
-    subject: 'results across all queries',
-    summarizer: 'relevant',
-    truthValue: llmQuantifierResult.membership,
-    support: aggregateLlmPrecision,
-    fullStatement: `${llmQuantifierResult.name.replace(/_/g, ' ')} of the results are relevant (avg precision: ${(aggregateLlmPrecision * 100).toFixed(1)}%)`
-  };
-  
-  // Calculate aggregate quality metrics
-  const allFuzzyMemberships = fuzzyResults.flatMap(r => r.matchDetails?.map(d => d.relevanceMembership) || []);
-  const allLlmMemberships = llmResults.flatMap(r => r.matchDetails?.map(d => d.relevanceMembership) || []);
-  
-  const aggregateFuzzyQuality = calculateSummaryQuality(fuzzyQuantifierResult.membership, allFuzzyMemberships, 1);
-  const aggregateLlmQuality = calculateSummaryQuality(llmQuantifierResult.membership, allLlmMemberships, 1);
-
-  // Log comparison summary with AGGREGATE TVLS
-  console.log('\n📈 MODEL COMPARISON REPORT (TVLS METRICS)');
+  // Log comparison summary
+  console.log('\n📈 MODEL COMPARISON REPORT (FUZZY LOGIC METRICS)');
   console.log('='.repeat(80));
   
   console.log('\n📐 FUZZY LOGIC NLP MODEL:');
   console.log(`  ⏱️  Avg Latency: ${fuzzyAverages.avgLatency.toFixed(2)}ms`);
-  console.log(`  🎯 Fuzzy Precision: ${fuzzyAverages.avgPrecision.toFixed(3)}`);
-  console.log(`  📍 Fuzzy Recall: ${fuzzyAverages.avgRecall.toFixed(3)}`);
-  console.log(`  📊 Fuzzy F1: ${fuzzyAverages.avgF1Score.toFixed(3)}`);
-  console.log(`  🔍 Filter Accuracy: ${fuzzyAverages.avgFilterAccuracy.toFixed(3)}`);
-  
-  console.log('\n  📝 AGGREGATE LINGUISTIC SUMMARY (TVLS):');
-  console.log(`     "${aggregateFuzzyTVLS.fullStatement}"`);
-  console.log(`     Quantifier: "${aggregateFuzzyTVLS.quantifier.replace(/_/g, ' ')}" → μ(${aggregateFuzzyPrecision.toFixed(3)}) = ${aggregateFuzzyTVLS.truthValue.toFixed(3)}`);
-  console.log(`     Support (avg precision): ${aggregateFuzzyTVLS.support.toFixed(3)}`);
-  
-  console.log('\n  📊 AGGREGATE QUALITY METRICS:');
-  console.log(`     Imprecision (T2): ${aggregateFuzzyQuality.degreeOfImprecision.toFixed(3)}`);
-  console.log(`     Covering (T3): ${aggregateFuzzyQuality.degreeOfCovering.toFixed(3)}`);
-  console.log(`     Appropriateness (T4): ${aggregateFuzzyQuality.degreeOfAppropriateness.toFixed(3)}`);
-  console.log(`     Length Quality (T5): ${aggregateFuzzyQuality.lengthQuality.toFixed(3)}`);
-  console.log(`     Overall Quality: ${aggregateFuzzyQuality.overallQuality.toFixed(3)}`);
+  console.log(`  🎯 Avg Fuzzy Precision: ${(fuzzyAverages.avgPrecision * 100).toFixed(1)}%`);
+  console.log(`  📍 Avg Fuzzy Recall: ${(fuzzyAverages.avgRecall * 100).toFixed(1)}%`);
+  console.log(`  📊 Avg F1 Score: ${(fuzzyAverages.avgF1Score * 100).toFixed(1)}%`);
+  console.log(`  🔍 Avg Filter Accuracy: ${(fuzzyAverages.avgFilterAccuracy * 100).toFixed(1)}%`);
   
   console.log('\n🤖 LLM MODEL (Gemini 2.5 Flash):');
   console.log(`  ⏱️  Avg Latency: ${llmAverages.avgLatency.toFixed(2)}ms`);
-  console.log(`  🎯 Fuzzy Precision: ${llmAverages.avgPrecision.toFixed(3)}`);
-  console.log(`  📍 Fuzzy Recall: ${llmAverages.avgRecall.toFixed(3)}`);
-  console.log(`  📊 Fuzzy F1: ${llmAverages.avgF1Score.toFixed(3)}`);
-  console.log(`  🔍 Filter Accuracy: ${llmAverages.avgFilterAccuracy.toFixed(3)}`);
-  
-  console.log('\n  📝 AGGREGATE LINGUISTIC SUMMARY (TVLS):');
-  console.log(`     "${aggregateLlmTVLS.fullStatement}"`);
-  console.log(`     Quantifier: "${aggregateLlmTVLS.quantifier.replace(/_/g, ' ')}" → μ(${aggregateLlmPrecision.toFixed(3)}) = ${aggregateLlmTVLS.truthValue.toFixed(3)}`);
-  console.log(`     Support (avg precision): ${aggregateLlmTVLS.support.toFixed(3)}`);
-  
-  console.log('\n  📊 AGGREGATE QUALITY METRICS:');
-  console.log(`     Imprecision (T2): ${aggregateLlmQuality.degreeOfImprecision.toFixed(3)}`);
-  console.log(`     Covering (T3): ${aggregateLlmQuality.degreeOfCovering.toFixed(3)}`);
-  console.log(`     Appropriateness (T4): ${aggregateLlmQuality.degreeOfAppropriateness.toFixed(3)}`);
-  console.log(`     Length Quality (T5): ${aggregateLlmQuality.lengthQuality.toFixed(3)}`);
-  console.log(`     Overall Quality: ${aggregateLlmQuality.overallQuality.toFixed(3)}`);
-  
-  // Add explanation of the Truth Value
-  console.log('\n  ℹ️  TVLS INTERPRETATION:');
-  console.log(`     Truth Value = μ_quantifier(proportion)`);
-  console.log(`     E.g., for precision ${(aggregateFuzzyPrecision * 100).toFixed(1)}%, best quantifier "${aggregateFuzzyTVLS.quantifier.replace(/_/g, ' ')}" has μ=${aggregateFuzzyTVLS.truthValue.toFixed(3)}`);
-  console.log(`     Higher truth value means the quantifier accurately describes the data.`);
+  console.log(`  🎯 Avg Fuzzy Precision: ${(llmAverages.avgPrecision * 100).toFixed(1)}%`);
+  console.log(`  📍 Avg Fuzzy Recall: ${(llmAverages.avgRecall * 100).toFixed(1)}%`);
+  console.log(`  📊 Avg F1 Score: ${(llmAverages.avgF1Score * 100).toFixed(1)}%`);
+  console.log(`  🔍 Avg Filter Accuracy: ${(llmAverages.avgFilterAccuracy * 100).toFixed(1)}%`);
   
   console.log('\n📊 COMPARISON:');
   const precisionDiff = llmAverages.avgPrecision - fuzzyAverages.avgPrecision;
@@ -312,16 +216,12 @@ export async function runModelComparison(): Promise<ComparisonReport> {
   const f1Diff = llmAverages.avgF1Score - fuzzyAverages.avgF1Score;
   const latencyDiff = llmAverages.avgLatency - fuzzyAverages.avgLatency;
   
-  console.log(`  Precision: LLM is ${precisionDiff > 0 ? '+' : ''}${precisionDiff.toFixed(3)} vs Fuzzy`);
-  console.log(`  Recall: LLM is ${recallDiff > 0 ? '+' : ''}${recallDiff.toFixed(3)} vs Fuzzy`);
-  console.log(`  F1 Score: LLM is ${f1Diff > 0 ? '+' : ''}${f1Diff.toFixed(3)} vs Fuzzy`);
+  console.log(`  Precision: LLM is ${precisionDiff > 0 ? '+' : ''}${(precisionDiff * 100).toFixed(1)}% vs Fuzzy`);
+  console.log(`  Recall: LLM is ${recallDiff > 0 ? '+' : ''}${(recallDiff * 100).toFixed(1)}% vs Fuzzy`);
+  console.log(`  F1 Score: LLM is ${f1Diff > 0 ? '+' : ''}${(f1Diff * 100).toFixed(1)}% vs Fuzzy`);
   console.log(`  Latency: LLM is ${latencyDiff > 0 ? '+' : ''}${latencyDiff.toFixed(0)}ms vs Fuzzy`);
   
   console.log('='.repeat(80) + '\n');
-
-  // Add TVLS data to the report for UI consumption (using aggregate TVLS)
-  (report as any).fuzzyTVLS = aggregateFuzzyTVLS;
-  (report as any).llmTVLS = aggregateLlmTVLS;
 
   return report;
 }
